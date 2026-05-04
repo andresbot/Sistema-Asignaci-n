@@ -4,6 +4,21 @@ const SECTION_DEFINITIONS = {
     fields: [
       { name: "code", label: "Codigo", type: "text", required: true },
       { name: "name", label: "Nombre", type: "text", required: true },
+      {
+        name: "campus_id",
+        label: "Campus",
+        type: "select",
+        required: true,
+        optionsFrom: "campuses",
+      },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  campuses: {
+    title: "Campus",
+    fields: [
+      { name: "code", label: "Codigo", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: true },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
@@ -71,6 +86,13 @@ const SECTION_DEFINITIONS = {
         type: "select",
         required: true,
         optionsFrom: "academicPrograms",
+      },
+      {
+        name: "academic_period_id",
+        label: "Periodo academico",
+        type: "select",
+        required: true,
+        optionsFrom: "periods",
       },
       { name: "semester", label: "Semestre", type: "number", required: true, min: 1 },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
@@ -169,7 +191,7 @@ function ConfigSectionCard({
             );
           }
 
-          if (field.type === "select") {
+            if (field.type === "select") {
             const fixedOptions = field.options ?? null;
             const options =
               sectionKey === "subjectOfferings" && field.name === "subject_group_id"
@@ -182,10 +204,11 @@ function ConfigSectionCard({
                   ? fixedOptions
                   : configState?.[field.optionsFrom]?.items ?? [];
 
-            return (
+              return (
               <label key={field.name}>
                 {field.label}
                 <select
+                  className={sectionState.fieldErrors?.[field.name] ? "input-error" : ""}
                   value={sectionState.form[field.name] ?? ""}
                   required={field.required}
                   onChange={(event) =>
@@ -202,6 +225,9 @@ function ConfigSectionCard({
                     </option>
                   ))}
                 </select>
+                {sectionState.fieldErrors?.[field.name] ? (
+                  <p className="error-text small">{sectionState.fieldErrors[field.name]}</p>
+                ) : null}
               </label>
             );
           }
@@ -210,6 +236,7 @@ function ConfigSectionCard({
             <label key={field.name}>
               {field.label}
               <input
+                className={sectionState.fieldErrors?.[field.name] ? "input-error" : ""}
                 type={field.type}
                 value={sectionState.form[field.name] ?? ""}
                 required={field.required}
@@ -219,9 +246,18 @@ function ConfigSectionCard({
                   onFieldChange(sectionKey, field.name, event.target.value)
                 }
               />
+              {sectionState.fieldErrors?.[field.name] ? (
+                <p className="error-text small">{sectionState.fieldErrors[field.name]}</p>
+              ) : null}
             </label>
           );
         })}
+
+        {sectionKey === "subjects" ? (
+          <div>
+            <p className="hint">Dificultad calculada: {Number(sectionState.form.weekly_hours || 0) * Number(sectionState.form.capacity || 0)}</p>
+          </div>
+        ) : null}
 
         {sectionState.error ? <p className="error-text">{sectionState.error}</p> : null}
 
@@ -267,6 +303,10 @@ function ConfigSectionCard({
 
 function buildItemSummary(sectionKey, item) {
   if (sectionKey === "academicPrograms") {
+    return `${item.code || "Sin codigo"} | ${item.campus?.name || item.campus_id || "Sin campus"}`;
+  }
+
+  if (sectionKey === "campuses") {
     return item.name || "Sin nombre";
   }
 

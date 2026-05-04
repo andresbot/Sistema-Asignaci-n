@@ -290,7 +290,7 @@ class MasterDataListCreateBaseAPIView(AdminProtectedAPIView):
     serializer_class = None
 
     def get_queryset(self, request):
-        queryset = self.queryset
+        queryset = self.queryset.all()
         queryset = _filter_by_is_active_param(queryset, request)
 
         search = request.query_params.get("search")
@@ -444,7 +444,7 @@ class CampusDetailAPIView(MasterDataDetailBaseAPIView):
     serializer_class = CampusSerializer
 
 
-class AcademicProgramListCreateAPIView(MasterDataListCreateBaseAPIView):
+class AcademicProgramListCreateAPIView(CoordinatorReadableConfigListCreateAPIView):
     queryset = AcademicProgram.objects.select_related("campus").order_by("name")
     serializer_class = AcademicProgramSerializer
 

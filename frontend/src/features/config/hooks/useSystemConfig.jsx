@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import {
+  createCampus,
+  createAcademicProgram,
   createCatalogItemByType,
   createPeriod,
   createSubject,
@@ -10,6 +12,7 @@ import {
   createTimeSlot,
   createWorkingDay,
   deactivateCatalogItemByType,
+  deleteCampus,
   deletePeriod,
   deleteSubject,
   deleteSubjectGroup,
@@ -17,7 +20,10 @@ import {
   deleteSpaceType,
   deleteTimeSlot,
   deleteWorkingDay,
+  deleteAcademicProgram,
   importMasterData,
+  listCampuses,
+  listAcademicPrograms,
   listCatalogItemsByType,
   listImportTemplates,
   listPeriods,
@@ -28,6 +34,8 @@ import {
   listTimeSlots,
   listWorkingDays,
   updateCatalogItemByType,
+  updateCampus,
+  updateAcademicProgram,
   updatePeriod,
   updateSubject,
   updateSubjectGroup,
@@ -54,6 +62,18 @@ function buildCatalogResource(catalogType) {
 }
 
 const RESOURCE_CONFIG = {
+  campuses: {
+    list: listCampuses,
+    create: createCampus,
+    update: updateCampus,
+    remove: deleteCampus,
+    defaultForm: {
+      code: "",
+      name: "",
+      is_active: true,
+    },
+    fieldOrder: ["code", "name", "is_active"],
+  },
   academicPrograms: {
     list: listAcademicPrograms,
     create: createAcademicProgram,
@@ -62,9 +82,10 @@ const RESOURCE_CONFIG = {
     defaultForm: {
       code: "",
       name: "",
+      campus_id: "",
       is_active: true,
     },
-    fieldOrder: ["code", "name", "is_active"],
+    fieldOrder: ["code", "name", "campus_id", "is_active"],
   },
   subjects: {
     list: listSubjects,
@@ -111,10 +132,18 @@ const RESOURCE_CONFIG = {
       subject_id: "",
       subject_group_id: "",
       academic_program_id: "",
+      academic_period_id: "",
       semester: "",
       is_active: true,
     },
-    fieldOrder: ["subject_id", "subject_group_id", "academic_program_id", "semester", "is_active"],
+    fieldOrder: [
+      "subject_id",
+      "subject_group_id",
+      "academic_program_id",
+      "academic_period_id",
+      "semester",
+      "is_active",
+    ],
   },
   periods: {
     list: listPeriods,
@@ -185,6 +214,17 @@ function buildDuplicateMatcher(resourceKey, form) {
 
 function validateForm(resourceKey, resourceState) {
   const { form, items, editId } = resourceState;
+
+  // Subjects: validate duplicate by `code` on client side
+  if (resourceKey === "subjects") {
+    const duplicateCode = items
+      .filter((item) => item.id !== editId)
+      .some((item) => normalizeText(item.code).toLowerCase() === normalizeText(form.code).toLowerCase());
+
+    if (duplicateCode) {
+      return "Ya existe una asignatura con ese codigo.";
+    }
+  }
 
   if (resourceKey === "periods") {
     if (!normalizeText(form.code)) {
@@ -263,6 +303,16 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
+    },
+    campuses: {
+      items: [],
+      form: { ...RESOURCE_CONFIG.campuses.defaultForm },
+      editId: null,
+      loading: false,
+      submitting: false,
+      error: "",
+      fieldErrors: {},
     },
     subjects: {
       items: [],
@@ -271,6 +321,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     subjectGroups: {
       items: [],
@@ -279,6 +330,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     subjectOfferings: {
       items: [],
@@ -287,6 +339,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     periods: {
       items: [],
@@ -295,6 +348,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     workingDays: {
       items: [],
@@ -303,6 +357,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     timeSlots: {
       items: [],
@@ -311,6 +366,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     teacherLinkTypes: {
       items: [],
@@ -319,6 +375,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     classTypes: {
       items: [],
@@ -327,6 +384,7 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
     academicSpaceTypes: {
       items: [],
@@ -335,11 +393,20 @@ function buildInitialState() {
       loading: false,
       submitting: false,
       error: "",
+      fieldErrors: {},
     },
   };
 }
 
 function normalizePayload(resourceKey, form) {
+  if (resourceKey === "campuses") {
+    return {
+      ...form,
+      code: normalizeText(form.code),
+      name: normalizeText(form.name),
+    };
+  }
+
   if (resourceKey === "periods") {
     return {
       ...form,
@@ -362,7 +429,17 @@ function normalizePayload(resourceKey, form) {
       subject_id: Number(form.subject_id),
       subject_group_id: Number(form.subject_group_id),
       academic_program_id: Number(form.academic_program_id),
+      academic_period_id: Number(form.academic_period_id),
       semester: Number(form.semester),
+    };
+  }
+
+  if (resourceKey === "academicPrograms") {
+    return {
+      ...form,
+      code: normalizeText(form.code),
+      name: normalizeText(form.name),
+      campus_id: Number(form.campus_id),
     };
   }
 
@@ -422,11 +499,18 @@ function mapItemToForm(resourceKey, item) {
     form.academic_program_id = String(
       item.academic_program?.id ?? item.academic_program_id ?? "",
     );
+    form.academic_period_id = String(
+      item.academic_period?.id ?? item.academic_period_id ?? "",
+    );
     form.semester = String(item.semester);
   }
 
   if (resourceKey === "subjectGroups") {
     form.subject_id = String(item.subject?.id ?? item.subject_id ?? "");
+  }
+
+  if (resourceKey === "academicPrograms") {
+    form.campus_id = String(item.campus?.id ?? item.campus_id ?? "");
   }
 
   if (resourceKey === "subjects") {
@@ -451,7 +535,7 @@ export function useSystemConfig({ authToken, enabled, role }) {
 
   const getResourceKeysForRole = (role) => {
     if (role === "coordinador") {
-      return ["subjectOfferings", "subjects", "subjectGroups", "academicPrograms"];
+      return ["subjectOfferings", "subjects", "subjectGroups", "academicPrograms", "campuses"];
     }
 
     return Object.keys(RESOURCE_CONFIG);
@@ -471,6 +555,7 @@ export function useSystemConfig({ authToken, enabled, role }) {
       form: { ...RESOURCE_CONFIG[resourceKey].defaultForm },
       submitting: false,
       error: "",
+      fieldErrors: {},
     }));
   };
 
@@ -718,6 +803,7 @@ export function useSystemConfig({ authToken, enabled, role }) {
       ...resourceState,
       submitting: true,
       error: "",
+      fieldErrors: {},
     }));
 
     const payload = normalizePayload(resourceKey, resourceStateSnapshot.form);
@@ -732,11 +818,34 @@ export function useSystemConfig({ authToken, enabled, role }) {
       await loadResource(resourceKey);
       resetResourceForm(resourceKey);
     } catch (error) {
-      setResourceState(resourceKey, (resourceState) => ({
-        ...resourceState,
-        submitting: false,
-        error: error.message || "No fue posible guardar el registro.",
-      }));
+      // Backend may return a validation object as JSON string; try to parse it
+      let parsed = null;
+      try {
+        parsed = JSON.parse(error.message);
+      } catch (e) {
+        parsed = null;
+      }
+
+      if (parsed && typeof parsed === "object") {
+        const fieldErrors = {};
+        Object.keys(parsed).forEach((k) => {
+          const v = parsed[k];
+          fieldErrors[k] = Array.isArray(v) ? v[0] : String(v);
+        });
+
+        setResourceState(resourceKey, (resourceState) => ({
+          ...resourceState,
+          submitting: false,
+          fieldErrors,
+        }));
+      } else {
+        setResourceState(resourceKey, (resourceState) => ({
+          ...resourceState,
+          submitting: false,
+          error: error.message || "No fue posible guardar el registro.",
+        }));
+      }
+
       return;
     }
 

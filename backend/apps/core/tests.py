@@ -118,8 +118,9 @@ class ProgrammingTests(BaseAuthTestCase):
             subject=self.subject,
             identifier="Grupo 1",
         )
+        self.campus = Campus.objects.create(code="01", name="Main Campus")
         self.academic_program = AcademicProgram.objects.create(
-            code="ING-SIS", name="Ingenieria de Sistemas"
+            code="ING-SIS", name="Ingenieria de Sistemas", campus=self.campus
         )
 
     def test_admin_can_create_subject_group(self):
@@ -289,7 +290,7 @@ class ProgrammingTests(BaseAuthTestCase):
         self.login_and_set_auth("coord@test.com", "coordpassword123")
 
         subjects_response = self.client.get(reverse("programming-subjects-list-create"))
-        programs_response = self.client.get(reverse("programming-academic-programs-list-create"))
+        programs_response = self.client.get(reverse("programs-list-create"))
 
         self.assertEqual(subjects_response.status_code, status.HTTP_200_OK)
         self.assertEqual(programs_response.status_code, status.HTTP_200_OK)
@@ -303,7 +304,7 @@ class ProgrammingTests(BaseAuthTestCase):
             format="json",
         )
         program_response = self.client.post(
-            reverse("programming-academic-programs-list-create"),
+            reverse("programs-list-create"),
             {"code": "ING-IND", "name": "Ingenieria Industrial", "is_active": True},
             format="json",
         )

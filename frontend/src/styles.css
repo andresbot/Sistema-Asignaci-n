@@ -232,6 +232,12 @@ select:focus {
   background: var(--surface-bright);
 }
 
+/* Error state for inputs/selects */
+.input-error {
+  border-bottom-color: color-mix(in srgb, var(--primary) 70%, #632129) !important;
+  background: #fff6f6 !important;
+}
+
 select option {
   color: var(--on-surface);
 }

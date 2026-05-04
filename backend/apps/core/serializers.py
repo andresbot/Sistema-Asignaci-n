@@ -367,6 +367,7 @@ class SpaceTypeSerializer(serializers.ModelSerializer):
 class SubjectOfferingSerializer(serializers.ModelSerializer):
     subject = SubjectSerializer(read_only=True)
     subject_group = SubjectGroupSerializer(read_only=True)
+    academic_period = AcademicPeriodSerializer(read_only=True)
     subject_id = serializers.PrimaryKeyRelatedField(
         source="subject", queryset=Subject.objects.all(), write_only=True
     )
@@ -376,6 +377,15 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
     academic_program_id = serializers.PrimaryKeyRelatedField(
         source="academic_program", queryset=AcademicProgram.objects.all(), write_only=True
     )
+    academic_period_id = serializers.PrimaryKeyRelatedField(
+        source="academic_period",
+        queryset=AcademicPeriod.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+
 
     class Meta:
         model = SubjectOffering
@@ -387,6 +397,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "subject_group_id",
             "academic_program_id",
             "academic_period",
+            "academic_period_id",
             "semester",
             "is_active",
             "created_at",
@@ -405,6 +416,9 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "subject_group": validated_data.get("subject_group", instance.subject_group),
             "academic_program": validated_data.get(
                 "academic_program", instance.academic_program
+            ),
+            "academic_period": validated_data.get(
+                "academic_period", instance.academic_period
             ),
             "semester": validated_data.get("semester", instance.semester),
             "is_active": validated_data.get("is_active", instance.is_active),

@@ -111,6 +111,60 @@ export function deleteSpaceType(token, id) {
   });
 }
 
+export function listCampuses(token) {
+  return coreApiRequest("/master-data/campuses/", { token });
+}
+
+export function createCampus(token, payload) {
+  return coreApiRequest("/master-data/campuses/", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateCampus(token, id, payload) {
+  return coreApiRequest(`/master-data/campuses/${id}/`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export function deleteCampus(token, id) {
+  return coreApiRequest(`/master-data/campuses/${id}/`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function listAcademicPrograms(token) {
+  return coreApiRequest("/master-data/programs/", { token });
+}
+
+export function createAcademicProgram(token, payload) {
+  return coreApiRequest("/master-data/programs/", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateAcademicProgram(token, id, payload) {
+  return coreApiRequest(`/master-data/programs/${id}/`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export function deleteAcademicProgram(token, id) {
+  return coreApiRequest(`/master-data/programs/${id}/`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function listCatalogItemsByType(token, catalogType, onlyActive = false) {
   const query = onlyActive ? "?is_active=true" : "";
   return coreApiRequest(`/catalogs/${catalogType}/${query}`, { token });
