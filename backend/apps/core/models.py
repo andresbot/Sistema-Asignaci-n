@@ -43,6 +43,7 @@ class AcademicPeriod(TimeStampedModel):
     start_date = models.DateField()
     end_date = models.DateField()
     is_active = models.BooleanField(default=True)
+    schedule_generated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-start_date"]
@@ -317,6 +318,20 @@ class SubjectOffering(TimeStampedModel):
         null=True,
         blank=True,
     )
+    working_day = models.ForeignKey(
+        "WorkingDay",
+        on_delete=models.PROTECT,
+        related_name="subject_offerings",
+        null=True,
+        blank=True,
+    )
+    time_slot = models.ForeignKey(
+        "TimeSlot",
+        on_delete=models.PROTECT,
+        related_name="subject_offerings",
+        null=True,
+        blank=True,
+    )
     academic_program = models.ForeignKey(
         AcademicProgram, on_delete=models.PROTECT, related_name="subject_offerings"
     )
@@ -341,4 +356,9 @@ class SubjectOffering(TimeStampedModel):
 
     def __str__(self):
         group_label = self.subject_group.identifier if self.subject_group else "Sin grupo"
-        return f"{self.subject.code} | {group_label} | {self.academic_program.code} | S{self.semester}"
+        day_label = self.working_day.name if self.working_day else "Sin dia"
+        slot_label = self.time_slot.name if self.time_slot else "Sin franja"
+        return (
+            f"{self.subject.code} | {group_label} | {self.academic_program.code} | "
+            f"{day_label} | {slot_label} | S{self.semester}"
+        )

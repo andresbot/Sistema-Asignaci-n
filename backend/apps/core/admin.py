@@ -78,6 +78,8 @@ class SubjectOfferingAdmin(admin.ModelAdmin):
     list_display = (
         "subject",
         "subject_group",
+        "working_day",
+        "time_slot",
         "academic_program",
         "academic_period",
         "semester",
@@ -86,10 +88,12 @@ class SubjectOfferingAdmin(admin.ModelAdmin):
     search_fields = (
         "subject__code",
         "subject_group__identifier",
+        "working_day__name",
+        "time_slot__name",
         "academic_program__code",
         "academic_period__code",
     )
-    list_filter = ("is_active", "academic_period", "academic_program")
+    list_filter = ("is_active", "working_day", "time_slot", "academic_period", "academic_program")
 
 
 @admin.register(TimeSlot)

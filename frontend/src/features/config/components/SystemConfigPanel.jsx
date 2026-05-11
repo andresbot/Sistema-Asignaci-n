@@ -88,11 +88,18 @@ const SECTION_DEFINITIONS = {
         optionsFrom: "academicPrograms",
       },
       {
-        name: "academic_period_id",
-        label: "Periodo academico",
+        name: "working_day_id",
+        label: "Dia laborable",
         type: "select",
         required: true,
-        optionsFrom: "periods",
+        optionsFrom: "workingDays",
+      },
+      {
+        name: "time_slot_id",
+        label: "Franja horaria",
+        type: "select",
+        required: true,
+        optionsFrom: "timeSlots",
       },
       { name: "semester", label: "Semestre", type: "number", required: true, min: 1 },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
@@ -200,6 +207,11 @@ function ConfigSectionCard({
                       String(option.subject?.id ?? option.subject_id ?? "") ===
                       String(sectionState.form.subject_id ?? ""),
                   )
+                : sectionKey === "subjectOfferings" &&
+                    (field.name === "working_day_id" || field.name === "time_slot_id")
+                  ? (configState?.[field.optionsFrom]?.items ?? []).filter(
+                      (option) => option.is_active !== false,
+                    )
                 : fixedOptions
                   ? fixedOptions
                   : configState?.[field.optionsFrom]?.items ?? [];
@@ -324,9 +336,12 @@ function buildItemSummary(sectionKey, item) {
     const subjectCode = item.subject?.code || item.subject_id || "Asignatura";
     const groupIdentifier = item.subject_group?.identifier || item.subject_group_id || "Grupo";
     const programCode = item.academic_program?.code || item.academic_program_id || "Programa";
-    const periodCode = item.academic_period?.code || "Periodo activo";
+    const workingDay = item.working_day?.name || item.working_day_id || "Dia";
+    const timeSlot = item.time_slot
+      ? `${item.time_slot.start_time} - ${item.time_slot.end_time}`
+      : item.time_slot_id || "Franja";
 
-    return `${programCode} | ${subjectCode} | ${groupIdentifier} | Semestre ${item.semester} | ${periodCode}`;
+    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | Semestre ${item.semester}`;
   }
 
   if (sectionKey === "periods") {
@@ -355,6 +370,14 @@ function buildItemSummary(sectionKey, item) {
 function buildOptionLabel(option) {
   if (option.label && option.value) {
     return option.label;
+  }
+
+  if (option.day_of_week && option.name) {
+    return `${option.day_of_week} - ${option.name}`;
+  }
+
+  if (option.start_time && option.end_time) {
+    return `${option.start_time} - ${option.end_time}`;
   }
 
   if (option.subject && option.identifier) {

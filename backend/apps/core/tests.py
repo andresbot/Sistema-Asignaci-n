@@ -21,6 +21,7 @@ from .models import (
     SubjectGroup,
     SubjectOffering,
     Teacher,
+    TimeSlot,
     UserProfile,
     WorkingDay,
 )
@@ -121,6 +122,13 @@ class ProgrammingTests(BaseAuthTestCase):
         self.campus = Campus.objects.create(code="01", name="Main Campus")
         self.academic_program = AcademicProgram.objects.create(
             code="ING-SIS", name="Ingenieria de Sistemas", campus=self.campus
+        )
+        self.working_day = WorkingDay.objects.create(day_of_week=4, name="Jueves", is_active=True)
+        self.time_slot = TimeSlot.objects.create(
+            name="14:00 - 19:00",
+            start_time=time(14, 0),
+            end_time=time(19, 0),
+            is_active=True,
         )
 
     def test_admin_can_create_subject_group(self):
@@ -239,6 +247,8 @@ class ProgrammingTests(BaseAuthTestCase):
                 "subject_id": self.subject.id,
                 "subject_group_id": self.subject_group.id,
                 "academic_program_id": self.academic_program.id,
+                "working_day_id": self.working_day.id,
+                "time_slot_id": self.time_slot.id,
                 "semester": "",
             },
             format="json",
@@ -256,6 +266,8 @@ class ProgrammingTests(BaseAuthTestCase):
                 "subject_id": self.subject.id,
                 "subject_group_id": self.subject_group.id,
                 "academic_program_id": self.academic_program.id,
+                "working_day_id": self.working_day.id,
+                "time_slot_id": self.time_slot.id,
                 "semester": 3,
             },
             format="json",
@@ -272,6 +284,8 @@ class ProgrammingTests(BaseAuthTestCase):
             "subject_id": self.subject.id,
             "subject_group_id": self.subject_group.id,
             "academic_program_id": self.academic_program.id,
+            "working_day_id": self.working_day.id,
+            "time_slot_id": self.time_slot.id,
             "semester": 3,
         }
 
@@ -321,6 +335,8 @@ class ProgrammingTests(BaseAuthTestCase):
                 "subject_id": self.subject.id,
                 "subject_group_id": self.subject_group.id,
                 "academic_program_id": self.academic_program.id,
+                "working_day_id": self.working_day.id,
+                "time_slot_id": self.time_slot.id,
                 "semester": 4,
             },
             format="json",
@@ -329,6 +345,27 @@ class ProgrammingTests(BaseAuthTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["academic_period"]["id"], self.active_period.id)
         self.assertEqual(response.data["semester"], 4)
+
+    def test_subject_offering_rejects_inactive_working_day(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        inactive_day = WorkingDay.objects.create(day_of_week=6, name="Sabado", is_active=False)
+
+        response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            {
+                "subject_id": self.subject.id,
+                "subject_group_id": self.subject_group.id,
+                "academic_program_id": self.academic_program.id,
+                "working_day_id": inactive_day.id,
+                "time_slot_id": self.time_slot.id,
+                "semester": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("working_day_id", response.data)
 
 
 class HealthCheckTests(APITestCase):

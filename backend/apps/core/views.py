@@ -348,7 +348,7 @@ class AcademicPeriodDetailAPIView(ConfigDetailBaseAPIView):
     serializer_class = AcademicPeriodSerializer
 
 
-class WorkingDayListCreateAPIView(ConfigListCreateBaseAPIView):
+class WorkingDayListCreateAPIView(CoordinatorReadableConfigListCreateAPIView):
     queryset = WorkingDay.objects.order_by("day_of_week")
     serializer_class = WorkingDaySerializer
 
@@ -358,7 +358,7 @@ class WorkingDayDetailAPIView(ConfigDetailBaseAPIView):
     serializer_class = WorkingDaySerializer
 
 
-class TimeSlotListCreateAPIView(ConfigListCreateBaseAPIView):
+class TimeSlotListCreateAPIView(CoordinatorReadableConfigListCreateAPIView):
     queryset = TimeSlot.objects.order_by("start_time")
     serializer_class = TimeSlotSerializer
 

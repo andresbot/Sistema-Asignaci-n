@@ -268,7 +268,15 @@ class UserUpdateSerializer(serializers.Serializer):
 class AcademicPeriodSerializer(serializers.ModelSerializer):
     class Meta:
         model = AcademicPeriod
-        fields = ["id", "code", "name", "start_date", "end_date", "is_active"]
+        fields = [
+            "id",
+            "code",
+            "name",
+            "start_date",
+            "end_date",
+            "is_active",
+            "schedule_generated_at",
+        ]
 
     def create(self, validated_data):
         try:
@@ -367,25 +375,25 @@ class SpaceTypeSerializer(serializers.ModelSerializer):
 class SubjectOfferingSerializer(serializers.ModelSerializer):
     subject = SubjectSerializer(read_only=True)
     subject_group = SubjectGroupSerializer(read_only=True)
+    working_day = WorkingDaySerializer(read_only=True)
+    time_slot = TimeSlotSerializer(read_only=True)
     academic_period = AcademicPeriodSerializer(read_only=True)
+    edit_warning = serializers.SerializerMethodField(read_only=True)
     subject_id = serializers.PrimaryKeyRelatedField(
         source="subject", queryset=Subject.objects.all(), write_only=True
     )
     subject_group_id = serializers.PrimaryKeyRelatedField(
         source="subject_group", queryset=SubjectGroup.objects.select_related("subject").all(), write_only=True
     )
+    working_day_id = serializers.PrimaryKeyRelatedField(
+        source="working_day", queryset=WorkingDay.objects.all(), write_only=True
+    )
+    time_slot_id = serializers.PrimaryKeyRelatedField(
+        source="time_slot", queryset=TimeSlot.objects.all(), write_only=True
+    )
     academic_program_id = serializers.PrimaryKeyRelatedField(
         source="academic_program", queryset=AcademicProgram.objects.all(), write_only=True
     )
-    academic_period_id = serializers.PrimaryKeyRelatedField(
-        source="academic_period",
-        queryset=AcademicPeriod.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
-        default=None,
-    )
-
 
     class Meta:
         model = SubjectOffering
@@ -395,9 +403,13 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "subject_id",
             "subject_group",
             "subject_group_id",
+            "working_day",
+            "working_day_id",
+            "time_slot",
+            "time_slot_id",
             "academic_program_id",
             "academic_period",
-            "academic_period_id",
+            "edit_warning",
             "semester",
             "is_active",
             "created_at",
@@ -408,12 +420,14 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
         try:
             return create_subject_offering(**validated_data)
         except ConfigValidationError as exc:
-            raise serializers.ValidationError({"subject_group_id": [str(exc)]}) from exc
+            _raise_config_validation_error(exc, default_field="subject_group_id")
 
     def update(self, instance, validated_data):
         payload = {
             "subject": validated_data.get("subject", instance.subject),
             "subject_group": validated_data.get("subject_group", instance.subject_group),
+            "working_day": validated_data.get("working_day", instance.working_day),
+            "time_slot": validated_data.get("time_slot", instance.time_slot),
             "academic_program": validated_data.get(
                 "academic_program", instance.academic_program
             ),
@@ -427,7 +441,23 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
         try:
             return update_subject_offering(instance, **payload)
         except ConfigValidationError as exc:
-            raise serializers.ValidationError({"subject_group_id": [str(exc)]}) from exc
+            _raise_config_validation_error(exc, default_field="subject_group_id")
+
+    def get_edit_warning(self, obj):
+        """Return a warning message if the academic period has a generated schedule."""
+        period = getattr(obj, "academic_period", None)
+        if not period:
+            return None
+        timestamp = getattr(period, "schedule_generated_at", None)
+        if not timestamp:
+            return None
+        try:
+            return (
+                f"⚠️ El horario para este período fue generado el {timestamp.strftime('%Y-%m-%d %H:%M')}. "
+                "Si realiza cambios, el horario deberá regenerarse."
+            )
+        except Exception:
+            return "⚠️ El horario para este período ya fue generado. Si realiza cambios, deberá regenerarse."
 
 
 class CatalogItemSerializer(serializers.ModelSerializer):

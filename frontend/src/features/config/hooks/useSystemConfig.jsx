@@ -132,7 +132,8 @@ const RESOURCE_CONFIG = {
       subject_id: "",
       subject_group_id: "",
       academic_program_id: "",
-      academic_period_id: "",
+      working_day_id: "",
+      time_slot_id: "",
       semester: "",
       is_active: true,
     },
@@ -140,7 +141,8 @@ const RESOURCE_CONFIG = {
       "subject_id",
       "subject_group_id",
       "academic_program_id",
-      "academic_period_id",
+      "working_day_id",
+      "time_slot_id",
       "semester",
       "is_active",
     ],
@@ -304,6 +306,7 @@ function buildInitialState() {
       submitting: false,
       error: "",
       fieldErrors: {},
+      editWarning: null,
     },
     campuses: {
       items: [],
@@ -340,6 +343,7 @@ function buildInitialState() {
       submitting: false,
       error: "",
       fieldErrors: {},
+      editWarning: null,
     },
     periods: {
       items: [],
@@ -349,6 +353,7 @@ function buildInitialState() {
       submitting: false,
       error: "",
       fieldErrors: {},
+      editWarning: null,
     },
     workingDays: {
       items: [],
@@ -367,6 +372,7 @@ function buildInitialState() {
       submitting: false,
       error: "",
       fieldErrors: {},
+      editWarning: null,
     },
     teacherLinkTypes: {
       items: [],
@@ -394,6 +400,7 @@ function buildInitialState() {
       submitting: false,
       error: "",
       fieldErrors: {},
+      editWarning: null,
     },
   };
 }
@@ -429,7 +436,8 @@ function normalizePayload(resourceKey, form) {
       subject_id: Number(form.subject_id),
       subject_group_id: Number(form.subject_group_id),
       academic_program_id: Number(form.academic_program_id),
-      academic_period_id: Number(form.academic_period_id),
+      working_day_id: Number(form.working_day_id),
+      time_slot_id: Number(form.time_slot_id),
       semester: Number(form.semester),
     };
   }
@@ -499,9 +507,8 @@ function mapItemToForm(resourceKey, item) {
     form.academic_program_id = String(
       item.academic_program?.id ?? item.academic_program_id ?? "",
     );
-    form.academic_period_id = String(
-      item.academic_period?.id ?? item.academic_period_id ?? "",
-    );
+    form.working_day_id = String(item.working_day?.id ?? item.working_day_id ?? "");
+    form.time_slot_id = String(item.time_slot?.id ?? item.time_slot_id ?? "");
     form.semester = String(item.semester);
   }
 
@@ -535,7 +542,15 @@ export function useSystemConfig({ authToken, enabled, role }) {
 
   const getResourceKeysForRole = (role) => {
     if (role === "coordinador") {
-      return ["subjectOfferings", "subjects", "subjectGroups", "academicPrograms", "campuses"];
+      return [
+        "subjectOfferings",
+        "subjects",
+        "subjectGroups",
+        "academicPrograms",
+        "campuses",
+        "workingDays",
+        "timeSlots",
+      ];
     }
 
     return Object.keys(RESOURCE_CONFIG);
@@ -742,6 +757,7 @@ export function useSystemConfig({ authToken, enabled, role }) {
       editId: item.id,
       form: mapItemToForm(resourceKey, item),
       error: "",
+      editWarning: item.edit_warning || null,
     }));
   };
 
@@ -788,6 +804,16 @@ export function useSystemConfig({ authToken, enabled, role }) {
 
     const resourceApi = RESOURCE_CONFIG[resourceKey];
     const resourceStateSnapshot = state[resourceKey];
+
+    // If there's an edit warning (e.g., schedule already generated), ask confirmation
+    if (resourceStateSnapshot.editWarning) {
+      const confirmed = window.confirm(
+        `${resourceStateSnapshot.editWarning}\n\n¿Desea continuar y guardar los cambios?`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
 
     const validationError = validateForm(resourceKey, resourceStateSnapshot);
     if (validationError) {
