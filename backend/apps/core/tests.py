@@ -326,6 +326,31 @@ class ProgrammingTests(BaseAuthTestCase):
         self.assertEqual(subject_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(program_response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_admin_can_create_subject_with_class_type_item_id(self):
+        """Reproduce creating a Subject sending `class_type_item_id` instead of legacy `class_type`."""
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        ct = CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.CLASS_TYPE).first()
+        self.assertIsNotNone(ct, "No class_type CatalogItem found in migrations")
+
+        payload = {
+            "code": "TST999",
+            "name": "Test Subject",
+            "class_type_item_id": ct.id,
+            "credits": 2,
+            "weekly_hours": 2,
+            "capacity": 10,
+            "is_active": True,
+        }
+
+        response = self.client.post(
+            reverse("programming-subjects-list-create"), payload, format="json"
+        )
+
+        self.assertIn(response.status_code, (status.HTTP_201_CREATED, status.HTTP_200_OK))
+        if response.status_code == status.HTTP_201_CREATED:
+            self.assertEqual(response.data["code"], "TST999")
+
     def test_coordinator_can_register_subject_offering(self):
         self.login_and_set_auth("coord@test.com", "coordpassword123")
 

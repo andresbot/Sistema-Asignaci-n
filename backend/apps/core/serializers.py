@@ -89,13 +89,28 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class SubjectSerializer(serializers.ModelSerializer):
+    # expose dynamic catalog item id for class type and keep legacy string for read
+    # allow legacy `class_type` in input but make it optional (clients may send
+    # either `class_type` or `class_type_item_id`).
+    class_type = serializers.CharField(required=False, allow_null=True)
+    class_type_item = serializers.SerializerMethodField(read_only=True)
+    class_type_item_id = serializers.PrimaryKeyRelatedField(
+        source="class_type_item",
+        queryset=CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.CLASS_TYPE),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = Subject
         fields = [
             "id",
             "code",
             "name",
-            "class_type",
+            "class_type",           # legacy read
+            "class_type_item",
+            "class_type_item_id",  # write
             "credits",
             "weekly_hours",
             "capacity",
@@ -105,6 +120,12 @@ class SubjectSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["difficulty", "created_at", "updated_at"]
+
+    def get_class_type_item(self, obj):
+        item = getattr(obj, "class_type_item", None)
+        if not item:
+            return None
+        return {"id": item.id, "name": item.name, "is_active": item.is_active}
 
     @staticmethod
     def _map_subject_error(message):

@@ -95,7 +95,7 @@ const RESOURCE_CONFIG = {
     defaultForm: {
       code: "",
       name: "",
-      class_type: "presencial",
+      class_type_id: "",
       credits: "",
       weekly_hours: "",
       capacity: "",
@@ -104,7 +104,7 @@ const RESOURCE_CONFIG = {
     fieldOrder: [
       "code",
       "name",
-      "class_type",
+      "class_type_id",
       "credits",
       "weekly_hours",
       "capacity",
@@ -278,7 +278,17 @@ function validateForm(resourceKey, resourceState) {
 
   const isDuplicate = items
     .filter((item) => item.id !== editId)
-    .some(buildDuplicateMatcher(resourceKey, form));
+    .some((item) => {
+      if (resourceKey === "subjectGroups") {
+        const itemSubjectId = String(item.subject?.id ?? item.subject_id ?? "");
+        const formSubjectId = String(form.subject_id ?? "");
+        const itemIdentifier = String(item.identifier ?? "").trim().toLowerCase();
+        const formIdentifier = String(form.identifier ?? "").trim().toLowerCase();
+        return itemSubjectId === formSubjectId && itemIdentifier === formIdentifier;
+      }
+
+      return buildDuplicateMatcher(resourceKey, form)(item);
+    });
 
   if (isDuplicate) {
     if (resourceKey === "periods") {
@@ -464,6 +474,7 @@ function normalizePayload(resourceKey, form) {
       credits: Number(form.credits),
       weekly_hours: Number(form.weekly_hours),
       capacity: Number(form.capacity),
+      class_type_item_id: form.class_type_id ? Number(form.class_type_id) : null,
     };
   }
 
@@ -524,6 +535,7 @@ function mapItemToForm(resourceKey, item) {
     form.credits = String(item.credits);
     form.weekly_hours = String(item.weekly_hours);
     form.capacity = String(item.capacity);
+    form.class_type_id = String(item.class_type_item?.id ?? "");
   }
 
   return form;

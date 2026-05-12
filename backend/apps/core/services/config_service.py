@@ -387,13 +387,25 @@ def update_academic_program(academic_program, *, code, name, is_active):
 
 
 @transaction.atomic
-def create_subject(*, code, name, class_type, credits, weekly_hours, capacity, is_active=True):
-    normalized_class_type = _validate_class_type(class_type)
+def create_subject(*, code, name, class_type=None, class_type_item=None, credits, weekly_hours, capacity, is_active=True):
+    # Prefer explicit class_type param (legacy clients). If not provided, derive from class_type_item.
+    if class_type is not None:
+        normalized_class_type = _validate_class_type(class_type)
+    elif class_type_item is not None:
+        ct_name = (class_type_item.name or "").lower()
+        if "presen" in ct_name:
+            normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
+        elif "virt" in ct_name:
+            normalized_class_type = Subject.CLASS_TYPE_VIRTUAL
+        else:
+            normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
+    else:
+        raise ConfigValidationError("El tipo de clase es obligatorio.")
     _validate_positive_integer(credits, "Los creditos")
     difficulty = _calculate_difficulty(weekly_hours=weekly_hours, capacity=capacity)
 
     try:
-        return Subject.objects.create(
+        subject = Subject.objects.create(
             code=_validate_code(code),
             name=_validate_required_name(name),
             class_type=normalized_class_type,
@@ -403,13 +415,28 @@ def create_subject(*, code, name, class_type, credits, weekly_hours, capacity, i
             difficulty=difficulty,
             is_active=is_active,
         )
+        if class_type_item is not None:
+            subject.class_type_item = class_type_item
+            subject.save(update_fields=["class_type_item"])
+        return subject
     except IntegrityError as exc:
         raise ConfigValidationError("Ya existe una asignatura con ese codigo.") from exc
 
 
 @transaction.atomic
-def update_subject(subject, *, code, name, class_type, credits, weekly_hours, capacity, is_active):
-    normalized_class_type = _validate_class_type(class_type)
+def update_subject(subject, *, code, name, class_type=None, class_type_item=None, credits, weekly_hours, capacity, is_active):
+    if class_type is not None:
+        normalized_class_type = _validate_class_type(class_type)
+    elif class_type_item is not None:
+        ct_name = (class_type_item.name or "").lower()
+        if "presen" in ct_name:
+            normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
+        elif "virt" in ct_name:
+            normalized_class_type = Subject.CLASS_TYPE_VIRTUAL
+        else:
+            normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
+    else:
+        normalized_class_type = subject.class_type
     _validate_positive_integer(credits, "Los creditos")
     difficulty = _calculate_difficulty(weekly_hours=weekly_hours, capacity=capacity)
 
@@ -421,6 +448,8 @@ def update_subject(subject, *, code, name, class_type, credits, weekly_hours, ca
     subject.capacity = capacity
     subject.difficulty = difficulty
     subject.is_active = is_active
+    if class_type_item is not None:
+        subject.class_type_item = class_type_item
 
     try:
         subject.save()

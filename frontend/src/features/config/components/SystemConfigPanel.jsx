@@ -28,14 +28,11 @@ const SECTION_DEFINITIONS = {
       { name: "code", label: "Codigo", type: "text", required: true },
       { name: "name", label: "Nombre", type: "text", required: true },
       {
-        name: "class_type",
+        name: "class_type_id",
         label: "Tipo de clase",
         type: "select",
         required: true,
-        options: [
-          { value: "presencial", label: "Presencial" },
-          { value: "virtual", label: "Virtual" },
-        ],
+        optionsFrom: "classTypes",
       },
       { name: "credits", label: "Creditos", type: "number", required: true, min: 1 },
       {
@@ -323,7 +320,8 @@ function buildItemSummary(sectionKey, item) {
   }
 
   if (sectionKey === "subjects") {
-    return `${item.class_type} | Creditos ${item.credits} | Intensidad ${item.weekly_hours} | Cupo ${item.capacity} | Dificultad ${item.difficulty}`;
+    const classTypeLabel = item.class_type_item?.name || item.class_type || "Tipo";
+    return `${classTypeLabel} | Creditos ${item.credits} | Intensidad ${item.weekly_hours} | Cupo ${item.capacity} | Dificultad ${item.difficulty}`;
   }
 
   if (sectionKey === "subjectGroups") {

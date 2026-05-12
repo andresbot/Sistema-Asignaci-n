@@ -65,10 +65,18 @@ class Subject(TimeStampedModel):
         (CLASS_TYPE_PRESENCIAL, "Presencial"),
         (CLASS_TYPE_VIRTUAL, "Virtual"),
     ]
-
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=120)
+    # Legacy static field kept for backward compatibility. New dynamic catalog field below.
     class_type = models.CharField(max_length=20, choices=CLASS_TYPE_CHOICES)
+    class_type_item = models.ForeignKey(
+        "CatalogItem",
+        on_delete=models.PROTECT,
+        related_name="subjects",
+        null=True,
+        blank=True,
+        limit_choices_to={"catalog_type": "class_type"},
+    )
     credits = models.PositiveSmallIntegerField()
     weekly_hours = models.PositiveSmallIntegerField()
     capacity = models.PositiveIntegerField()
