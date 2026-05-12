@@ -98,6 +98,21 @@ const SECTION_DEFINITIONS = {
         required: true,
         optionsFrom: "timeSlots",
       },
+      {
+        name: "required_space_type_id",
+        label: "Tipo de espacio requerido",
+        type: "select",
+        required: false,
+        optionsFrom: "academicSpaceTypes",
+      },
+      {
+        name: "teacher_id",
+        label: "Docente responsable",
+        type: "select",
+        required: false,
+        optionsFrom: "teachers",
+      },
+      { name: "student_count", label: "Cupo matriculado", type: "number", required: false, min: 0 },
       { name: "semester", label: "Semestre", type: "number", required: true, min: 1 },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
@@ -157,6 +172,30 @@ const SECTION_DEFINITIONS = {
     fields: [
       { name: "name", label: "Nombre", type: "text", required: true },
       { name: "description", label: "Descripcion", type: "text", required: false },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  classrooms: {
+    title: "Salones disponibles",
+    fields: [
+      { name: "code", label: "Codigo", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: true },
+      {
+        name: "campus_id",
+        label: "Campus",
+        type: "select",
+        required: true,
+        optionsFrom: "campuses",
+      },
+      {
+        name: "space_type_id",
+        label: "Tipo de espacio",
+        type: "select",
+        required: true,
+        optionsFrom: "academicSpaceTypes",
+      },
+      { name: "capacity", label: "Capacidad", type: "number", required: true, min: 1 },
+      { name: "is_accessible", label: "Accesible", type: "checkbox", required: false },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
@@ -338,8 +377,13 @@ function buildItemSummary(sectionKey, item) {
     const timeSlot = item.time_slot
       ? `${item.time_slot.start_time} - ${item.time_slot.end_time}`
       : item.time_slot_id || "Franja";
+    const spaceType = item.required_space_type?.name || "Sin tipo de espacio";
+    const teacher = item.teacher
+      ? `${item.teacher.first_name} ${item.teacher.last_name}`.trim()
+      : "Sin docente";
 
-    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | Semestre ${item.semester}`;
+    const cupo = item.student_count !== null && item.student_count !== undefined ? `Cupo ${item.student_count}` : "Sin cupo";
+    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | S${item.semester} | ${spaceType} | ${teacher} | ${cupo}`;
   }
 
   if (sectionKey === "periods") {
@@ -362,6 +406,13 @@ function buildItemSummary(sectionKey, item) {
     return item.description || "Sin descripcion";
   }
 
+  if (sectionKey === "classrooms") {
+    const campus = item.campus?.name || item.campus_id || "Sin campus";
+    const spaceType = item.space_type?.name || item.space_type_id || "Sin tipo";
+    const accessible = item.is_accessible ? "Accesible" : "No accesible";
+    return `${campus} | ${spaceType} | Cap. ${item.capacity} | ${accessible}`;
+  }
+
   return "";
 }
 
@@ -376,6 +427,10 @@ function buildOptionLabel(option) {
 
   if (option.start_time && option.end_time) {
     return `${option.start_time} - ${option.end_time}`;
+  }
+
+  if (option.first_name !== undefined && option.last_name !== undefined) {
+    return `${option.first_name} ${option.last_name}`.trim();
   }
 
   if (option.subject && option.identifier) {

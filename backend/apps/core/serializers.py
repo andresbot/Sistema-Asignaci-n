@@ -393,94 +393,6 @@ class SpaceTypeSerializer(serializers.ModelSerializer):
             _raise_config_validation_error(exc, default_field="name")
 
 
-class SubjectOfferingSerializer(serializers.ModelSerializer):
-    subject = SubjectSerializer(read_only=True)
-    subject_group = SubjectGroupSerializer(read_only=True)
-    working_day = WorkingDaySerializer(read_only=True)
-    time_slot = TimeSlotSerializer(read_only=True)
-    academic_period = AcademicPeriodSerializer(read_only=True)
-    edit_warning = serializers.SerializerMethodField(read_only=True)
-    subject_id = serializers.PrimaryKeyRelatedField(
-        source="subject", queryset=Subject.objects.all(), write_only=True
-    )
-    subject_group_id = serializers.PrimaryKeyRelatedField(
-        source="subject_group", queryset=SubjectGroup.objects.select_related("subject").all(), write_only=True
-    )
-    working_day_id = serializers.PrimaryKeyRelatedField(
-        source="working_day", queryset=WorkingDay.objects.all(), write_only=True
-    )
-    time_slot_id = serializers.PrimaryKeyRelatedField(
-        source="time_slot", queryset=TimeSlot.objects.all(), write_only=True
-    )
-    academic_program_id = serializers.PrimaryKeyRelatedField(
-        source="academic_program", queryset=AcademicProgram.objects.all(), write_only=True
-    )
-
-    class Meta:
-        model = SubjectOffering
-        fields = [
-            "id",
-            "subject",
-            "subject_id",
-            "subject_group",
-            "subject_group_id",
-            "working_day",
-            "working_day_id",
-            "time_slot",
-            "time_slot_id",
-            "academic_program_id",
-            "academic_period",
-            "edit_warning",
-            "semester",
-            "is_active",
-            "created_at",
-            "updated_at",
-        ]
-
-    def create(self, validated_data):
-        try:
-            return create_subject_offering(**validated_data)
-        except ConfigValidationError as exc:
-            _raise_config_validation_error(exc, default_field="subject_group_id")
-
-    def update(self, instance, validated_data):
-        payload = {
-            "subject": validated_data.get("subject", instance.subject),
-            "subject_group": validated_data.get("subject_group", instance.subject_group),
-            "working_day": validated_data.get("working_day", instance.working_day),
-            "time_slot": validated_data.get("time_slot", instance.time_slot),
-            "academic_program": validated_data.get(
-                "academic_program", instance.academic_program
-            ),
-            "academic_period": validated_data.get(
-                "academic_period", instance.academic_period
-            ),
-            "semester": validated_data.get("semester", instance.semester),
-            "is_active": validated_data.get("is_active", instance.is_active),
-        }
-
-        try:
-            return update_subject_offering(instance, **payload)
-        except ConfigValidationError as exc:
-            _raise_config_validation_error(exc, default_field="subject_group_id")
-
-    def get_edit_warning(self, obj):
-        """Return a warning message if the academic period has a generated schedule."""
-        period = getattr(obj, "academic_period", None)
-        if not period:
-            return None
-        timestamp = getattr(period, "schedule_generated_at", None)
-        if not timestamp:
-            return None
-        try:
-            return (
-                f"⚠️ El horario para este período fue generado el {timestamp.strftime('%Y-%m-%d %H:%M')}. "
-                "Si realiza cambios, el horario deberá regenerarse."
-            )
-        except Exception:
-            return "⚠️ El horario para este período ya fue generado. Si realiza cambios, deberá regenerarse."
-
-
 class CatalogItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CatalogItem
@@ -505,6 +417,125 @@ class CatalogItemSerializer(serializers.ModelSerializer):
             return update_catalog_item(instance, **payload)
         except ConfigValidationError as exc:
             _raise_config_validation_error(exc, default_field="name")
+
+
+class TeacherSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Teacher
+        fields = ["id", "first_name", "last_name", "email", "is_active"]
+
+
+class SubjectOfferingSerializer(serializers.ModelSerializer):
+    subject = SubjectSerializer(read_only=True)
+    subject_group = SubjectGroupSerializer(read_only=True)
+    working_day = WorkingDaySerializer(read_only=True)
+    time_slot = TimeSlotSerializer(read_only=True)
+    required_space_type = CatalogItemSerializer(read_only=True)
+    teacher = TeacherSummarySerializer(read_only=True)
+    academic_period = AcademicPeriodSerializer(read_only=True)
+    edit_warning = serializers.SerializerMethodField(read_only=True)
+    subject_id = serializers.PrimaryKeyRelatedField(
+        source="subject", queryset=Subject.objects.all(), write_only=True
+    )
+    subject_group_id = serializers.PrimaryKeyRelatedField(
+        source="subject_group", queryset=SubjectGroup.objects.select_related("subject").all(), write_only=True
+    )
+    working_day_id = serializers.PrimaryKeyRelatedField(
+        source="working_day", queryset=WorkingDay.objects.all(), write_only=True
+    )
+    time_slot_id = serializers.PrimaryKeyRelatedField(
+        source="time_slot", queryset=TimeSlot.objects.all(), write_only=True
+    )
+    required_space_type_id = serializers.PrimaryKeyRelatedField(
+        source="required_space_type",
+        queryset=CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    teacher_id = serializers.PrimaryKeyRelatedField(
+        source="teacher",
+        queryset=Teacher.objects.filter(is_active=True),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    academic_program_id = serializers.PrimaryKeyRelatedField(
+        source="academic_program", queryset=AcademicProgram.objects.all(), write_only=True
+    )
+
+    class Meta:
+        model = SubjectOffering
+        fields = [
+            "id",
+            "subject",
+            "subject_id",
+            "subject_group",
+            "subject_group_id",
+            "working_day",
+            "working_day_id",
+            "time_slot",
+            "time_slot_id",
+            "required_space_type",
+            "required_space_type_id",
+            "teacher",
+            "teacher_id",
+            "student_count",
+            "academic_program_id",
+            "academic_period",
+            "edit_warning",
+            "semester",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_required_space_type_id(self, value):
+        if value is not None and value.catalog_type != CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE:
+            raise serializers.ValidationError("El tipo de espacio debe ser del catalogo de espacios academicos.")
+        return value
+
+    def create(self, validated_data):
+        try:
+            return create_subject_offering(**validated_data)
+        except ConfigValidationError as exc:
+            _raise_config_validation_error(exc, default_field="subject_group_id")
+
+    def update(self, instance, validated_data):
+        payload = {
+            "subject": validated_data.get("subject", instance.subject),
+            "subject_group": validated_data.get("subject_group", instance.subject_group),
+            "working_day": validated_data.get("working_day", instance.working_day),
+            "time_slot": validated_data.get("time_slot", instance.time_slot),
+            "required_space_type": validated_data.get("required_space_type", instance.required_space_type),
+            "teacher": validated_data.get("teacher", instance.teacher),
+            "student_count": validated_data.get("student_count", instance.student_count),
+            "academic_program": validated_data.get("academic_program", instance.academic_program),
+            "academic_period": validated_data.get("academic_period", instance.academic_period),
+            "semester": validated_data.get("semester", instance.semester),
+            "is_active": validated_data.get("is_active", instance.is_active),
+        }
+
+        try:
+            return update_subject_offering(instance, **payload)
+        except ConfigValidationError as exc:
+            _raise_config_validation_error(exc, default_field="subject_group_id")
+
+    def get_edit_warning(self, obj):
+        """Return a warning message if the academic period has a generated schedule."""
+        period = getattr(obj, "academic_period", None)
+        if not period:
+            return None
+        timestamp = getattr(period, "schedule_generated_at", None)
+        if not timestamp:
+            return None
+        try:
+            return (
+                f"⚠️ El horario para este período fue generado el {timestamp.strftime('%Y-%m-%d %H:%M')}. "
+                "Si realiza cambios, el horario deberá regenerarse."
+            )
+        except Exception:
+            return "⚠️ El horario para este período ya fue generado. Si realiza cambios, deberá regenerarse."
 
 
 class CampusSerializer(serializers.ModelSerializer):
@@ -609,3 +640,8 @@ class ClassroomSerializer(serializers.ModelSerializer):
         if space_type.catalog_type != CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE:
             raise serializers.ValidationError("El tipo de espacio academico no es valido.")
         return space_type
+
+    def validate_capacity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La capacidad debe ser mayor a cero.")
+        return value

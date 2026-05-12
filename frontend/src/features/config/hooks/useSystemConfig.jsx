@@ -4,6 +4,7 @@ import {
   createCampus,
   createAcademicProgram,
   createCatalogItemByType,
+  createClassroom,
   createPeriod,
   createSubject,
   createSubjectGroup,
@@ -13,6 +14,7 @@ import {
   createWorkingDay,
   deactivateCatalogItemByType,
   deleteCampus,
+  deleteClassroom,
   deletePeriod,
   deleteSubject,
   deleteSubjectGroup,
@@ -25,17 +27,20 @@ import {
   listCampuses,
   listAcademicPrograms,
   listCatalogItemsByType,
+  listClassrooms,
   listImportTemplates,
   listPeriods,
   listSubjects,
   listSubjectGroups,
   listSubjectOfferings,
   listSpaceTypes,
+  listTeachers,
   listTimeSlots,
   listWorkingDays,
   updateCatalogItemByType,
   updateCampus,
   updateAcademicProgram,
+  updateClassroom,
   updatePeriod,
   updateSubject,
   updateSubjectGroup,
@@ -134,6 +139,9 @@ const RESOURCE_CONFIG = {
       academic_program_id: "",
       working_day_id: "",
       time_slot_id: "",
+      required_space_type_id: "",
+      teacher_id: "",
+      student_count: "",
       semester: "",
       is_active: true,
     },
@@ -143,6 +151,9 @@ const RESOURCE_CONFIG = {
       "academic_program_id",
       "working_day_id",
       "time_slot_id",
+      "required_space_type_id",
+      "teacher_id",
+      "student_count",
       "semester",
       "is_active",
     ],
@@ -186,9 +197,33 @@ const RESOURCE_CONFIG = {
     },
     fieldOrder: ["name", "start_time", "end_time", "is_active"],
   },
+  teachers: {
+    list: listTeachers,
+    create: null,
+    update: null,
+    remove: null,
+    defaultForm: {},
+    fieldOrder: [],
+  },
   teacherLinkTypes: buildCatalogResource("teacher_link_type"),
   classTypes: buildCatalogResource("class_type"),
   academicSpaceTypes: buildCatalogResource("academic_space_type"),
+  classrooms: {
+    list: listClassrooms,
+    create: createClassroom,
+    update: updateClassroom,
+    remove: deleteClassroom,
+    defaultForm: {
+      code: "",
+      name: "",
+      campus_id: "",
+      space_type_id: "",
+      capacity: "",
+      is_accessible: false,
+      is_active: true,
+    },
+    fieldOrder: ["code", "name", "campus_id", "space_type_id", "capacity", "is_accessible", "is_active"],
+  },
 };
 
 function normalizeText(value) {
@@ -384,6 +419,15 @@ function buildInitialState() {
       fieldErrors: {},
       editWarning: null,
     },
+    teachers: {
+      items: [],
+      form: {},
+      editId: null,
+      loading: false,
+      submitting: false,
+      error: "",
+      fieldErrors: {},
+    },
     teacherLinkTypes: {
       items: [],
       form: { ...RESOURCE_CONFIG.teacherLinkTypes.defaultForm },
@@ -411,6 +455,15 @@ function buildInitialState() {
       error: "",
       fieldErrors: {},
       editWarning: null,
+    },
+    classrooms: {
+      items: [],
+      form: { ...RESOURCE_CONFIG.classrooms.defaultForm },
+      editId: null,
+      loading: false,
+      submitting: false,
+      error: "",
+      fieldErrors: {},
     },
   };
 }
@@ -448,7 +501,21 @@ function normalizePayload(resourceKey, form) {
       academic_program_id: Number(form.academic_program_id),
       working_day_id: Number(form.working_day_id),
       time_slot_id: Number(form.time_slot_id),
+      required_space_type_id: form.required_space_type_id ? Number(form.required_space_type_id) : null,
+      teacher_id: form.teacher_id ? Number(form.teacher_id) : null,
+      student_count: form.student_count !== "" && form.student_count !== null ? Number(form.student_count) : null,
       semester: Number(form.semester),
+    };
+  }
+
+  if (resourceKey === "classrooms") {
+    return {
+      ...form,
+      code: normalizeText(form.code),
+      name: normalizeText(form.name),
+      campus_id: Number(form.campus_id),
+      space_type_id: Number(form.space_type_id),
+      capacity: Number(form.capacity),
     };
   }
 
@@ -520,7 +587,16 @@ function mapItemToForm(resourceKey, item) {
     );
     form.working_day_id = String(item.working_day?.id ?? item.working_day_id ?? "");
     form.time_slot_id = String(item.time_slot?.id ?? item.time_slot_id ?? "");
+    form.required_space_type_id = String(item.required_space_type?.id ?? item.required_space_type_id ?? "");
+    form.teacher_id = String(item.teacher?.id ?? item.teacher_id ?? "");
+    form.student_count = item.student_count !== null && item.student_count !== undefined ? String(item.student_count) : "";
     form.semester = String(item.semester);
+  }
+
+  if (resourceKey === "classrooms") {
+    form.campus_id = String(item.campus?.id ?? item.campus_id ?? "");
+    form.space_type_id = String(item.space_type?.id ?? item.space_type_id ?? "");
+    form.capacity = String(item.capacity);
   }
 
   if (resourceKey === "subjectGroups") {
@@ -562,6 +638,8 @@ export function useSystemConfig({ authToken, enabled, role }) {
         "campuses",
         "workingDays",
         "timeSlots",
+        "academicSpaceTypes",
+        "teachers",
       ];
     }
 

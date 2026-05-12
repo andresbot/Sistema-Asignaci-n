@@ -527,22 +527,36 @@ class SubjectOfferingDetailAPIView(CoordinatorProtectedAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TeacherListCreateAPIView(MasterDataListCreateBaseAPIView):
-    queryset = Teacher.objects.select_related("link_type").order_by("last_name", "first_name")
-    serializer_class = TeacherSerializer
+class TeacherListCreateAPIView(CoordinatorProtectedAPIView):
+    def _get_queryset(self, request):
+        queryset = Teacher.objects.select_related("link_type").order_by("last_name", "first_name")
+        queryset = _filter_by_is_active_param(queryset, request)
 
-    def apply_search_filter(self, queryset, search):
-        return queryset.filter(
-            Q(first_name__icontains=search)
-            | Q(last_name__icontains=search)
-            | Q(email__icontains=search)
-        )
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(email__icontains=search)
+            )
 
-    def apply_extra_filters(self, queryset, request):
         link_type_id = request.query_params.get("link_type_id")
         if link_type_id:
             queryset = queryset.filter(link_type_id=link_type_id)
+
         return queryset
+
+    def get(self, request):
+        serializer = TeacherSerializer(self._get_queryset(request), many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if get_user_role_name(request.user) != "administrador":
+            raise PermissionDenied("Solo administradores pueden crear docentes.")
+        serializer = TeacherSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(TeacherSerializer(instance).data, status=status.HTTP_201_CREATED)
 
 
 class TeacherDetailAPIView(MasterDataDetailBaseAPIView):

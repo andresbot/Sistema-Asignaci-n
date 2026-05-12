@@ -340,6 +340,22 @@ class SubjectOffering(TimeStampedModel):
         null=True,
         blank=True,
     )
+    required_space_type = models.ForeignKey(
+        "CatalogItem",
+        on_delete=models.PROTECT,
+        related_name="subject_offerings",
+        null=True,
+        blank=True,
+        limit_choices_to={"catalog_type": "academic_space_type"},
+    )
+    teacher = models.ForeignKey(
+        "Teacher",
+        on_delete=models.SET_NULL,
+        related_name="subject_offerings",
+        null=True,
+        blank=True,
+    )
+    student_count = models.PositiveIntegerField(null=True, blank=True)
     academic_program = models.ForeignKey(
         AcademicProgram, on_delete=models.PROTECT, related_name="subject_offerings"
     )

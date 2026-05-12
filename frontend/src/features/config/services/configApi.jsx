@@ -209,6 +209,37 @@ export function importMasterData(token, resourceType, file) {
   });
 }
 
+export function listTeachers(token) {
+  return coreApiRequest("/master-data/teachers/", { token });
+}
+
+export function listClassrooms(token) {
+  return coreApiRequest("/master-data/classrooms/", { token });
+}
+
+export function createClassroom(token, payload) {
+  return coreApiRequest("/master-data/classrooms/", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateClassroom(token, id, payload) {
+  return coreApiRequest(`/master-data/classrooms/${id}/`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export function deleteClassroom(token, id) {
+  return coreApiRequest(`/master-data/classrooms/${id}/`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function listSubjects(token) {
   return coreApiRequest("/programming/subjects/", { token });
 }

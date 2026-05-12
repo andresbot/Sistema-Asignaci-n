@@ -1618,3 +1618,363 @@ class ConfigServiceTests(TestCase):
                 description="No valido",
                 is_active=True,
             )
+
+
+class ClassroomTests(BaseAuthTestCase):
+    """Unit tests for Classroom CRUD — target ≥ 95% coverage."""
+
+    def setUp(self):
+        self.admin_user = self.create_user(
+            email="admin.classroom@test.com",
+            password="adminpassword123",
+            role=self.admin_role,
+            first_name="Ana",
+            last_name="Admin",
+        )
+        self.coordinator_user = self.create_user(
+            email="coord.classroom@test.com",
+            password="coordpassword123",
+            role=self.coordinator_role,
+            first_name="Carlos",
+            last_name="Coord",
+        )
+        self.campus = Campus.objects.create(code="MAIN", name="Campus Principal")
+        self.space_type = CatalogItem.objects.create(
+            catalog_type="academic_space_type",
+            name="Aula",
+            description="Salon convencional",
+        )
+
+    def _classroom_payload(self, **kwargs):
+        payload = {
+            "code": "A101",
+            "name": "Salon A101",
+            "campus_id": self.campus.id,
+            "space_type_id": self.space_type.id,
+            "capacity": 30,
+            "is_accessible": False,
+            "is_active": True,
+        }
+        payload.update(kwargs)
+        return payload
+
+    # --- LIST ---
+
+    def test_admin_can_list_classrooms(self):
+        Classroom.objects.create(
+            code="B200",
+            name="Salon B200",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=20,
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.get(reverse("classrooms-list-create"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 1)
+
+    def test_coordinator_cannot_list_classrooms(self):
+        self.login_and_set_auth("coord.classroom@test.com", "coordpassword123")
+        response = self.client.get(reverse("classrooms-list-create"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    # --- CREATE ---
+
+    def test_admin_can_create_classroom(self):
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["code"], "A101")
+        self.assertEqual(response.data["capacity"], 30)
+        self.assertFalse(response.data["is_accessible"])
+
+    def test_coordinator_cannot_create_classroom(self):
+        self.login_and_set_auth("coord.classroom@test.com", "coordpassword123")
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(code="X999"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_duplicate_code_is_rejected(self):
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(code="DUP01"),
+            format="json",
+        )
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(code="DUP01", name="Salon duplicado"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_zero_capacity_is_rejected(self):
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(capacity=0),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_space_type_must_be_academic_space_type(self):
+        wrong_catalog = CatalogItem.objects.create(
+            catalog_type="class_type",
+            name="Clase magistral",
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(space_type_id=wrong_catalog.id),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_is_accessible_flag_is_persisted(self):
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.post(
+            reverse("classrooms-list-create"),
+            self._classroom_payload(code="ACC01", is_accessible=True),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["is_accessible"])
+        self.assertTrue(Classroom.objects.get(code="ACC01").is_accessible)
+
+    # --- UPDATE ---
+
+    def test_admin_can_update_classroom(self):
+        classroom = Classroom.objects.create(
+            code="UPD01",
+            name="Original",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=25,
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.patch(
+            reverse("classrooms-detail", args=[classroom.id]),
+            {"name": "Actualizado", "capacity": 40},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        classroom.refresh_from_db()
+        self.assertEqual(classroom.name, "Actualizado")
+        self.assertEqual(classroom.capacity, 40)
+
+    def test_coordinator_cannot_update_classroom(self):
+        classroom = Classroom.objects.create(
+            code="NOUPD",
+            name="No actualizable",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=20,
+        )
+        self.login_and_set_auth("coord.classroom@test.com", "coordpassword123")
+        response = self.client.patch(
+            reverse("classrooms-detail", args=[classroom.id]),
+            {"capacity": 50},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    # --- DELETE ---
+
+    def test_admin_can_delete_classroom(self):
+        classroom = Classroom.objects.create(
+            code="DEL01",
+            name="Para eliminar",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=15,
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.delete(reverse("classrooms-detail", args=[classroom.id]))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Classroom.objects.filter(id=classroom.id).exists())
+
+    def test_coordinator_cannot_delete_classroom(self):
+        classroom = Classroom.objects.create(
+            code="NODEL",
+            name="No borrable",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=10,
+        )
+        self.login_and_set_auth("coord.classroom@test.com", "coordpassword123")
+        response = self.client.delete(reverse("classrooms-detail", args=[classroom.id]))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    # --- FILTER ---
+
+    def test_filter_by_campus(self):
+        other_campus = Campus.objects.create(code="OTR", name="Otra sede")
+        Classroom.objects.create(
+            code="CAM1", name="En campus principal", campus=self.campus,
+            space_type=self.space_type, capacity=20,
+        )
+        Classroom.objects.create(
+            code="CAM2", name="En otra sede", campus=other_campus,
+            space_type=self.space_type, capacity=20,
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.get(
+            reverse("classrooms-list-create"),
+            {"campus_id": self.campus.id},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        codes = [item["code"] for item in response.data]
+        self.assertIn("CAM1", codes)
+        self.assertNotIn("CAM2", codes)
+
+    def test_filter_by_is_accessible(self):
+        Classroom.objects.create(
+            code="ACC10", name="Accesible", campus=self.campus,
+            space_type=self.space_type, capacity=20, is_accessible=True,
+        )
+        Classroom.objects.create(
+            code="NAC10", name="No accesible", campus=self.campus,
+            space_type=self.space_type, capacity=20, is_accessible=False,
+        )
+        self.login_and_set_auth("admin.classroom@test.com", "adminpassword123")
+        response = self.client.get(
+            reverse("classrooms-list-create"),
+            {"is_accessible": "true"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        codes = [item["code"] for item in response.data]
+        self.assertIn("ACC10", codes)
+        self.assertNotIn("NAC10", codes)
+
+    # --- UNAUTHENTICATED ---
+
+    def test_unauthenticated_request_is_rejected(self):
+        response = self.client.get(reverse("classrooms-list-create"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SubjectOfferingStudentCountTests(BaseAuthTestCase):
+    """Tests for student_count field on SubjectOffering (HU - Registrar cupo)."""
+
+    def setUp(self):
+        self.admin_user = self.create_user(
+            email="admin.sc@test.com",
+            password="adminpassword123",
+            role=self.admin_role,
+            first_name="Ana",
+            last_name="Admin",
+        )
+        self.coordinator_user = self.create_user(
+            email="coord.sc@test.com",
+            password="coordpassword123",
+            role=self.coordinator_role,
+            first_name="Carlos",
+            last_name="Coord",
+        )
+        self.campus = Campus.objects.create(code="SC-CAM", name="Campus SC")
+        self.program = AcademicProgram.objects.create(
+            code="SC-PROG", name="Programa SC", campus=self.campus
+        )
+        self.period = AcademicPeriod.objects.create(
+            code="SC-2026",
+            name="Periodo SC",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+        )
+        self.subject = Subject.objects.create(
+            code="SC-MAT",
+            name="Matematicas SC",
+            class_type="presencial",
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=12,
+        )
+        self.subject_group = SubjectGroup.objects.create(
+            subject=self.subject,
+            identifier="Grupo A",
+        )
+        self.working_day = WorkingDay.objects.create(day_of_week=1, name="Lunes SC", is_active=True)
+        self.time_slot = TimeSlot.objects.create(
+            name="07:00-09:00 SC",
+            start_time=time(7, 0),
+            end_time=time(9, 0),
+            is_active=True,
+        )
+
+    def _offering_payload(self, **kwargs):
+        payload = {
+            "subject_id": self.subject.id,
+            "subject_group_id": self.subject_group.id,
+            "academic_program_id": self.program.id,
+            "working_day_id": self.working_day.id,
+            "time_slot_id": self.time_slot.id,
+            "semester": 1,
+            "is_active": True,
+        }
+        payload.update(kwargs)
+        return payload
+
+    def test_student_count_is_null_by_default(self):
+        self.login_and_set_auth("coord.sc@test.com", "coordpassword123")
+        response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            self._offering_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["student_count"])
+
+    def test_coordinator_can_set_student_count(self):
+        self.login_and_set_auth("coord.sc@test.com", "coordpassword123")
+        response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            self._offering_payload(student_count=45),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["student_count"], 45)
+
+    def test_coordinator_can_update_student_count(self):
+        self.login_and_set_auth("coord.sc@test.com", "coordpassword123")
+        create_response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            self._offering_payload(student_count=30),
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        offering_id = create_response.data["id"]
+
+        update_response = self.client.patch(
+            reverse("programming-subject-offerings-detail", args=[offering_id]),
+            {"student_count": 55},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data["student_count"], 55)
+
+    def test_student_count_can_be_cleared_to_null(self):
+        self.login_and_set_auth("coord.sc@test.com", "coordpassword123")
+        create_response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            self._offering_payload(student_count=20),
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        offering_id = create_response.data["id"]
+
+        update_response = self.client.patch(
+            reverse("programming-subject-offerings-detail", args=[offering_id]),
+            {"student_count": None},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(update_response.data["student_count"])
