@@ -38,7 +38,11 @@ from .services.config_service import (
     update_time_slot,
     update_working_day,
 )
-from .services.programming_service import create_subject_offering, update_subject_offering
+from .services.programming_service import (
+    create_subject_offering,
+    get_offering_non_assignable_reason,
+    update_subject_offering,
+)
 from .services.user_service import (
     UserEmailAlreadyExistsError,
     create_user_with_profile,
@@ -434,6 +438,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
     teacher = TeacherSummarySerializer(read_only=True)
     academic_period = AcademicPeriodSerializer(read_only=True)
     edit_warning = serializers.SerializerMethodField(read_only=True)
+    non_assignable_reason = serializers.SerializerMethodField(read_only=True)
     subject_id = serializers.PrimaryKeyRelatedField(
         source="subject", queryset=Subject.objects.all(), write_only=True
     )
@@ -481,6 +486,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "teacher",
             "teacher_id",
             "student_count",
+            "non_assignable_reason",
             "academic_program_id",
             "academic_period",
             "edit_warning",
@@ -536,6 +542,9 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             )
         except Exception:
             return "⚠️ El horario para este período ya fue generado. Si realiza cambios, deberá regenerarse."
+
+    def get_non_assignable_reason(self, obj):
+        return get_offering_non_assignable_reason(obj)
 
 
 class CampusSerializer(serializers.ModelSerializer):

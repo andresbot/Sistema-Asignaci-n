@@ -1,6 +1,6 @@
 from django.db import IntegrityError, transaction
 
-from apps.core.models import AcademicPeriod, Classroom, SubjectOffering
+from apps.core.models import AcademicPeriod, Classroom, Subject, SubjectOffering
 
 from .config_service import ConfigValidationError
 
@@ -9,7 +9,42 @@ def get_active_academic_period():
     return AcademicPeriod.objects.filter(is_active=True).order_by("-start_date", "-id").first()
 
 
-def check_classrooms_available_for_space_type(required_space_type, working_day, time_slot):
+def get_offering_non_assignable_reason(offering):
+    """Return a reason string if the offering cannot be assigned due to student_count, or None.
+
+    Used by the scheduling algorithm to report non-assignable offerings (HU-8 Scenario 2).
+    """
+    student_count = offering.student_count
+    if not student_count:
+        return None
+
+    if offering.required_space_type is not None:
+        available, reason = check_classrooms_available_for_space_type(
+            offering.required_space_type,
+            working_day=None,
+            time_slot=None,
+            student_count=student_count,
+        )
+        return reason if not available else None
+
+    has_capacity = Classroom.objects.filter(
+        is_active=True,
+        capacity__gte=student_count,
+    ).exists()
+    if not has_capacity:
+        return f"sin salones disponibles con capacidad para {student_count} estudiantes"
+    return None
+
+
+def _validate_space_type_compatibility(subject, required_space_type):
+    if subject.class_type == Subject.CLASS_TYPE_VIRTUAL and required_space_type is not None:
+        raise ConfigValidationError(
+            "Las asignaturas virtuales no requieren un tipo de espacio fisico.",
+            field="required_space_type_id",
+        )
+
+
+def check_classrooms_available_for_space_type(required_space_type, working_day, time_slot, student_count=None):
     """Return (available: bool, reason: str).
 
     Used by the scheduling algorithm to validate Escenario 2 of HU21:
@@ -23,7 +58,12 @@ def check_classrooms_available_for_space_type(required_space_type, working_day, 
         space_type=required_space_type,
         is_active=True,
     )
+    if student_count is not None and student_count > 0:
+        classrooms_of_type = classrooms_of_type.filter(capacity__gte=student_count)
+
     if not classrooms_of_type.exists():
+        if student_count is not None and student_count > 0:
+            return False, f"sin salones del tipo requerido con capacidad para {student_count} estudiantes"
         return False, "sin salones del tipo requerido disponibles"
 
     if working_day is None or time_slot is None:
@@ -76,6 +116,7 @@ def create_subject_offering(
         raise ConfigValidationError("No existe un periodo academico activo.")
 
     _validate_offering_fields(subject, subject_group, working_day, time_slot)
+    _validate_space_type_compatibility(subject, required_space_type)
 
     try:
         return SubjectOffering.objects.create(
@@ -112,6 +153,7 @@ def update_subject_offering(
     is_active,
 ):
     _validate_offering_fields(subject, subject_group, working_day, time_slot)
+    _validate_space_type_compatibility(subject, required_space_type)
 
     subject_offering.subject = subject
     subject_offering.subject_group = subject_group

@@ -116,6 +116,28 @@ def _validate_positive_integer(value, field_label):
         raise ConfigValidationError(f"{field_label} debe ser mayor a cero.")
 
 
+SUBJECT_CREDITS_MAX = 20
+SUBJECT_WEEKLY_HOURS_MAX = 40
+
+
+def _validate_credits_range(credits):
+    _validate_positive_integer(credits, "Los creditos")
+    if credits > SUBJECT_CREDITS_MAX:
+        raise ConfigValidationError(
+            f"Los creditos no pueden superar {SUBJECT_CREDITS_MAX}.",
+            field="credits",
+        )
+
+
+def _validate_weekly_hours_range(weekly_hours):
+    _validate_positive_integer(weekly_hours, "La intensidad horaria")
+    if weekly_hours > SUBJECT_WEEKLY_HOURS_MAX:
+        raise ConfigValidationError(
+            f"La intensidad horaria no puede superar {SUBJECT_WEEKLY_HOURS_MAX} horas semanales.",
+            field="weekly_hours",
+        )
+
+
 def _validate_class_type(class_type):
     valid_types = {choice[0] for choice in Subject.CLASS_TYPE_CHOICES}
     legacy_map = {
@@ -401,7 +423,8 @@ def create_subject(*, code, name, class_type=None, class_type_item=None, credits
             normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
     else:
         raise ConfigValidationError("El tipo de clase es obligatorio.")
-    _validate_positive_integer(credits, "Los creditos")
+    _validate_credits_range(credits)
+    _validate_weekly_hours_range(weekly_hours)
     difficulty = _calculate_difficulty(weekly_hours=weekly_hours, capacity=capacity)
 
     try:
@@ -437,7 +460,8 @@ def update_subject(subject, *, code, name, class_type=None, class_type_item=None
             normalized_class_type = Subject.CLASS_TYPE_PRESENCIAL
     else:
         normalized_class_type = subject.class_type
-    _validate_positive_integer(credits, "Los creditos")
+    _validate_credits_range(credits)
+    _validate_weekly_hours_range(weekly_hours)
     difficulty = _calculate_difficulty(weekly_hours=weekly_hours, capacity=capacity)
 
     subject.code = _validate_code(code)

@@ -509,9 +509,16 @@ class SubjectOfferingListCreateAPIView(CoordinatorProtectedAPIView):
 class SubjectOfferingDetailAPIView(CoordinatorProtectedAPIView):
     def get_object(self, subject_offering_id):
         return get_object_or_404(
-            SubjectOffering.objects.select_related("subject", "academic_program", "academic_period"),
+            SubjectOffering.objects.select_related(
+                "subject", "subject_group", "working_day", "time_slot",
+                "required_space_type", "teacher", "academic_program", "academic_period",
+            ),
             id=subject_offering_id,
         )
+
+    def get(self, _request, subject_offering_id):
+        instance = self.get_object(subject_offering_id)
+        return Response(SubjectOfferingSerializer(instance).data)
 
     def patch(self, request, subject_offering_id):
         instance = self.get_object(subject_offering_id)

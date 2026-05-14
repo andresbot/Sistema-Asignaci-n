@@ -26,10 +26,13 @@ from .models import (
     WorkingDay,
 )
 from .services.config_service import (
+    SUBJECT_CREDITS_MAX,
+    SUBJECT_WEEKLY_HOURS_MAX,
     ConfigValidationError,
     create_academic_period,
     create_catalog_item,
     create_space_type,
+    create_subject,
     create_time_slot,
     create_working_day,
     update_academic_period,
@@ -37,6 +40,10 @@ from .services.config_service import (
     update_space_type,
     update_time_slot,
     update_working_day,
+)
+from .services.programming_service import (
+    check_classrooms_available_for_space_type,
+    create_subject_offering,
 )
 from .services.user_service import (
     UserEmailAlreadyExistsError,
@@ -1978,3 +1985,550 @@ class SubjectOfferingStudentCountTests(BaseAuthTestCase):
         )
         self.assertEqual(update_response.status_code, status.HTTP_200_OK)
         self.assertIsNone(update_response.data["student_count"])
+
+
+class BusinessRuleTests(TestCase):
+    """Tests for TEC-21: capacity, space-type compatibility, credits/hours ranges."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.campus = Campus.objects.create(code="TEC21", name="Campus TEC21")
+        cls.program = AcademicProgram.objects.create(
+            code="TEC21-PRG", name="Programa TEC21", campus=cls.campus
+        )
+        cls.period = AcademicPeriod.objects.create(
+            code="TEC21-2026",
+            name="Periodo TEC21",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+        )
+        cls.working_day = WorkingDay.objects.create(
+            day_of_week=5, name="Viernes TEC21", is_active=True
+        )
+        cls.time_slot = TimeSlot.objects.create(
+            name="10:00-12:00 TEC21",
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            is_active=True,
+        )
+        cls.space_type = CatalogItem.objects.create(
+            catalog_type="academic_space_type",
+            name="Aula TEC21",
+        )
+
+    # --- Regla 3: Creditos e intensidad horaria en rangos permitidos ---
+
+    def test_credits_above_maximum_are_rejected(self):
+        with self.assertRaises(ConfigValidationError) as ctx:
+            create_subject(
+                code="TST-CRED",
+                name="Test Creditos",
+                class_type="presencial",
+                credits=SUBJECT_CREDITS_MAX + 1,
+                weekly_hours=4,
+                capacity=30,
+            )
+        self.assertEqual(ctx.exception.field, "credits")
+
+    def test_credits_at_maximum_are_accepted(self):
+        subject = create_subject(
+            code="TST-CMAX",
+            name="Test Creditos Max",
+            class_type="presencial",
+            credits=SUBJECT_CREDITS_MAX,
+            weekly_hours=4,
+            capacity=30,
+        )
+        self.assertEqual(subject.credits, SUBJECT_CREDITS_MAX)
+
+    def test_weekly_hours_above_maximum_are_rejected(self):
+        with self.assertRaises(ConfigValidationError) as ctx:
+            create_subject(
+                code="TST-WHRS",
+                name="Test Horas",
+                class_type="presencial",
+                credits=3,
+                weekly_hours=SUBJECT_WEEKLY_HOURS_MAX + 1,
+                capacity=30,
+            )
+        self.assertEqual(ctx.exception.field, "weekly_hours")
+
+    def test_weekly_hours_at_maximum_are_accepted(self):
+        subject = create_subject(
+            code="TST-WMAX",
+            name="Test Horas Max",
+            class_type="presencial",
+            credits=3,
+            weekly_hours=SUBJECT_WEEKLY_HOURS_MAX,
+            capacity=30,
+        )
+        self.assertEqual(subject.weekly_hours, SUBJECT_WEEKLY_HOURS_MAX)
+
+    # --- Regla 2: Compatibilidad asignatura-tipo de espacio ---
+
+    def test_virtual_subject_with_space_type_is_rejected(self):
+        subject = Subject.objects.create(
+            code="TST-VIRT",
+            name="Asignatura Virtual",
+            class_type=Subject.CLASS_TYPE_VIRTUAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        group = SubjectGroup.objects.create(subject=subject, identifier="GV1")
+
+        with self.assertRaises(ConfigValidationError) as ctx:
+            create_subject_offering(
+                subject=subject,
+                subject_group=group,
+                working_day=self.working_day,
+                time_slot=self.time_slot,
+                required_space_type=self.space_type,
+                academic_program=self.program,
+                academic_period=self.period,
+                semester=1,
+            )
+        self.assertEqual(ctx.exception.field, "required_space_type_id")
+
+    def test_presencial_subject_with_space_type_is_accepted(self):
+        subject = Subject.objects.create(
+            code="TST-PRES",
+            name="Asignatura Presencial",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        group = SubjectGroup.objects.create(subject=subject, identifier="GP1")
+
+        offering = create_subject_offering(
+            subject=subject,
+            subject_group=group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            required_space_type=self.space_type,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+        )
+        self.assertEqual(offering.required_space_type, self.space_type)
+
+    def test_virtual_subject_without_space_type_is_accepted(self):
+        subject = Subject.objects.create(
+            code="TST-VNST",
+            name="Virtual Sin Espacio",
+            class_type=Subject.CLASS_TYPE_VIRTUAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        group = SubjectGroup.objects.create(subject=subject, identifier="GVN1")
+
+        offering = create_subject_offering(
+            subject=subject,
+            subject_group=group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            required_space_type=None,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+        )
+        self.assertIsNone(offering.required_space_type)
+
+    # --- Regla 1: Capacidad del salon cubre numero de estudiantes ---
+
+    def test_classroom_with_sufficient_capacity_is_available(self):
+        Classroom.objects.create(
+            code="CAP-LRG",
+            name="Salon Grande",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=50,
+        )
+        available, reason = check_classrooms_available_for_space_type(
+            self.space_type, None, None, student_count=30
+        )
+        self.assertTrue(available)
+        self.assertEqual(reason, "")
+
+    def test_no_classroom_with_sufficient_capacity_returns_unavailable(self):
+        small_type = CatalogItem.objects.create(
+            catalog_type="academic_space_type",
+            name="Micro TEC21",
+        )
+        Classroom.objects.create(
+            code="CAP-SML",
+            name="Salon Pequeno",
+            campus=self.campus,
+            space_type=small_type,
+            capacity=5,
+        )
+        available, reason = check_classrooms_available_for_space_type(
+            small_type, None, None, student_count=100
+        )
+        self.assertFalse(available)
+        self.assertIn("capacidad", reason)
+
+    def test_capacity_filter_ignores_undersized_classrooms(self):
+        exact_type = CatalogItem.objects.create(
+            catalog_type="academic_space_type",
+            name="Exacto TEC21",
+        )
+        Classroom.objects.create(
+            code="CAP-XS",
+            name="Salon XS",
+            campus=self.campus,
+            space_type=exact_type,
+            capacity=20,
+        )
+        Classroom.objects.create(
+            code="CAP-XL",
+            name="Salon XL",
+            campus=self.campus,
+            space_type=exact_type,
+            capacity=60,
+        )
+        available, _ = check_classrooms_available_for_space_type(
+            exact_type, None, None, student_count=40
+        )
+        self.assertTrue(available)
+
+
+class SubjectOfferingEditWarningTests(BaseAuthTestCase):
+    """Tests for HU: editar programación antes/después de ejecutar el algoritmo."""
+
+    def setUp(self):
+        self.coordinator_user = self.create_user(
+            email="coord.ew@test.com",
+            password="coordpassword123",
+            role=self.coordinator_role,
+            first_name="Carlos",
+            last_name="Coord",
+        )
+        self.campus = Campus.objects.create(code="EW-CAM", name="Campus EW")
+        self.program = AcademicProgram.objects.create(
+            code="EW-PRG", name="Programa EW", campus=self.campus
+        )
+        self.subject = Subject.objects.create(
+            code="EW-MAT",
+            name="Matematicas EW",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        self.subject_group = SubjectGroup.objects.create(
+            subject=self.subject, identifier="Grupo EW"
+        )
+        self.working_day = WorkingDay.objects.create(
+            day_of_week=2, name="Martes EW", is_active=True
+        )
+        self.time_slot = TimeSlot.objects.create(
+            name="08:00-10:00 EW",
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            is_active=True,
+        )
+
+    def _make_period(self, *, schedule_generated_at=None):
+        from django.utils import timezone
+        code = f"EW-{schedule_generated_at.timestamp() if schedule_generated_at else 'none'}"
+        return AcademicPeriod.objects.create(
+            code=code[:20],
+            name="Periodo EW",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+            schedule_generated_at=schedule_generated_at,
+        )
+
+    def _make_offering(self, period):
+        return SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            academic_program=self.program,
+            academic_period=period,
+            semester=1,
+        )
+
+    # --- Escenario 1: editar antes de ejecutar el algoritmo ---
+
+    def test_edit_before_algorithm_returns_no_warning(self):
+        """Escenario 1: sin schedule_generated_at → edit_warning es None."""
+        period = self._make_period()
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.patch(
+            reverse("programming-subject-offerings-detail", args=[offering.id]),
+            {"student_count": 25},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["edit_warning"])
+        self.assertEqual(response.data["student_count"], 25)
+
+    def test_get_offering_before_algorithm_has_no_warning(self):
+        """GET detalle antes del algoritmo: edit_warning es None."""
+        period = self._make_period()
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["edit_warning"])
+
+    # --- Escenario 2: editar después de ejecutar el algoritmo ---
+
+    def test_edit_after_algorithm_returns_warning(self):
+        """Escenario 2: con schedule_generated_at → edit_warning contiene el aviso."""
+        from django.utils import timezone
+        period = self._make_period(schedule_generated_at=timezone.now())
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.patch(
+            reverse("programming-subject-offerings-detail", args=[offering.id]),
+            {"student_count": 30},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["edit_warning"])
+        self.assertIn("regenerarse", response.data["edit_warning"])
+        self.assertEqual(response.data["student_count"], 30)
+
+    def test_get_offering_after_algorithm_shows_warning(self):
+        """GET detalle después del algoritmo: edit_warning contiene el aviso."""
+        from django.utils import timezone
+        period = self._make_period(schedule_generated_at=timezone.now())
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["edit_warning"])
+        self.assertIn("regenerarse", response.data["edit_warning"])
+
+    def test_edit_after_algorithm_still_persists_changes(self):
+        """El sistema permite editar aun cuando el algoritmo ya fue ejecutado."""
+        from django.utils import timezone
+        period = self._make_period(schedule_generated_at=timezone.now())
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.patch(
+            reverse("programming-subject-offerings-detail", args=[offering.id]),
+            {"student_count": 99},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        offering.refresh_from_db()
+        self.assertEqual(offering.student_count, 99)
+
+    def test_warning_includes_generation_timestamp(self):
+        """El aviso incluye la fecha/hora de generación del horario."""
+        from django.utils import timezone
+        generated_at = timezone.now()
+        period = self._make_period(schedule_generated_at=generated_at)
+        offering = self._make_offering(period)
+        self.login_and_set_auth("coord.ew@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        warning = response.data["edit_warning"]
+        self.assertIsNotNone(warning)
+        self.assertIn(generated_at.strftime("%Y-%m-%d"), warning)
+
+
+class RegisterStudentCountHUTests(BaseAuthTestCase):
+    """Tests for HU-8: registrar número de estudiantes por asignatura."""
+
+    def setUp(self):
+        self.coordinator_user = self.create_user(
+            email="coord.hu8@test.com",
+            password="coordpassword123",
+            role=self.coordinator_role,
+            first_name="Carlos",
+            last_name="Coord",
+        )
+        self.campus = Campus.objects.create(code="HU8-CAM", name="Campus HU8")
+        self.program = AcademicProgram.objects.create(
+            code="HU8-PRG", name="Programa HU8", campus=self.campus
+        )
+        self.period = AcademicPeriod.objects.create(
+            code="HU8-2026",
+            name="Periodo HU8",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+        )
+        self.subject = Subject.objects.create(
+            code="HU8-MAT",
+            name="Matematicas HU8",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        self.subject_group = SubjectGroup.objects.create(
+            subject=self.subject, identifier="Grupo HU8"
+        )
+        self.working_day = WorkingDay.objects.create(
+            day_of_week=3, name="Miercoles HU8", is_active=True
+        )
+        self.time_slot = TimeSlot.objects.create(
+            name="09:00-11:00 HU8",
+            start_time=time(9, 0),
+            end_time=time(11, 0),
+            is_active=True,
+        )
+        self.space_type = CatalogItem.objects.create(
+            catalog_type="academic_space_type",
+            name="Aula HU8",
+        )
+
+    def _create_offering(self, student_count=None, space_type=None):
+        return SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            required_space_type=space_type,
+            student_count=student_count,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+        )
+
+    # --- Escenario 1: Registrar el cupo de una asignatura ---
+
+    def test_coordinator_can_register_student_count(self):
+        """El coordinador registra el cupo; el sistema lo almacena."""
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+        response = self.client.post(
+            reverse("programming-subject-offerings-list-create"),
+            {
+                "subject_id": self.subject.id,
+                "subject_group_id": self.subject_group.id,
+                "academic_program_id": self.program.id,
+                "working_day_id": self.working_day.id,
+                "time_slot_id": self.time_slot.id,
+                "semester": 2,
+                "student_count": 28,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["student_count"], 28)
+
+    def test_non_assignable_reason_is_null_when_classrooms_have_capacity(self):
+        """Escenario 1: con salones con capacidad suficiente → non_assignable_reason es null."""
+        Classroom.objects.create(
+            code="HU8-LAR",
+            name="Salon Grande HU8",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=50,
+        )
+        offering = self._create_offering(student_count=30, space_type=self.space_type)
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["student_count"], 30)
+        self.assertIsNone(response.data["non_assignable_reason"])
+
+    def test_non_assignable_reason_is_null_when_no_student_count(self):
+        """Sin cupo registrado no se calcula la razón de no asignabilidad."""
+        offering = self._create_offering(student_count=None)
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["non_assignable_reason"])
+
+    # --- Escenario 2: Cupo supera la capacidad de todos los salones ---
+
+    def test_non_assignable_reason_when_student_count_exceeds_all_classrooms(self):
+        """Escenario 2: cupo mayor que cualquier salón → non_assignable_reason con mensaje."""
+        Classroom.objects.create(
+            code="HU8-SML",
+            name="Salon Pequeno HU8",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=20,
+        )
+        offering = self._create_offering(student_count=100, space_type=self.space_type)
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["non_assignable_reason"])
+        self.assertIn("capacidad", response.data["non_assignable_reason"])
+
+    def test_non_assignable_reason_visible_on_list(self):
+        """El campo non_assignable_reason aparece también en el listado de programación."""
+        Classroom.objects.create(
+            code="HU8-MED",
+            name="Salon Mediano HU8",
+            campus=self.campus,
+            space_type=self.space_type,
+            capacity=15,
+        )
+        self._create_offering(student_count=200, space_type=self.space_type)
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-list-create")
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        offering_data = next(
+            (o for o in response.data if o["student_count"] == 200), None
+        )
+        self.assertIsNotNone(offering_data)
+        self.assertIn("non_assignable_reason", offering_data)
+        self.assertIsNotNone(offering_data["non_assignable_reason"])
+
+    def test_non_assignable_reason_when_no_classrooms_exist(self):
+        """Sin ningún salón activo, un cupo registrado resulta no asignable."""
+        offering = self._create_offering(student_count=10, space_type=None)
+        self.login_and_set_auth("coord.hu8@test.com", "coordpassword123")
+
+        response = self.client.get(
+            reverse("programming-subject-offerings-detail", args=[offering.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["non_assignable_reason"])
+        self.assertIn("capacidad", response.data["non_assignable_reason"])
