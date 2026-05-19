@@ -30,8 +30,10 @@ jobs:
       - name: Django system check
         run: python manage.py check
 
-      - name: Run backend tests
-        run: python manage.py test
+      - name: Run backend tests with coverage gate
+        run: |
+          python -m coverage run --source=apps/core --omit='*/migrations/*,*/admin.py,*/apps.py,*/__init__.py' manage.py test apps.core --noinput
+          python -m coverage report -m --fail-under=95
 
   frontend:
     name: Frontend build

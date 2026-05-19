@@ -37,9 +37,12 @@ Centralizar y optimizar el proceso de asignación académica, permitiendo:
 
 ## Roles del sistema
 
-- Usuario
 - Administrador
 - Coordinador
+- Docente
+- Estudiante
+
+> Nota: "Usuario" se usa solo como término general para referirse a cualquier persona que accede al sistema; no es un rol funcional independiente.
 
 ## Alcance funcional inicial
 
