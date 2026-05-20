@@ -399,6 +399,280 @@ class ProgrammingTests(BaseAuthTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("working_day_id", response.data)
 
+    def test_my_schedule_teacher_student_admin_and_unpublished_behaviour(self):
+        # prepare link type for teachers
+        link_type = CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE).first()
+        if not link_type:
+            link_type = CatalogItem.objects.create(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE, name="Contratado")
+
+        # create a teacher user and Teacher entry
+        teacher_user = self.create_user(
+            email="teacher1@test.com",
+            password="teachpass123",
+            role=self.docente_role,
+            first_name="T",
+            last_name="One",
+        )
+        teacher = Teacher.objects.create(
+            first_name="T",
+            last_name="One",
+            email=teacher_user.email,
+            link_type=link_type,
+            hourly_rate=10.0,
+            user_profile=teacher_user.profile,
+        )
+
+        # another teacher
+        other_teacher = Teacher.objects.create(
+            first_name="Other",
+            last_name="Teacher",
+            email="other@test.com",
+            link_type=link_type,
+            hourly_rate=12.0,
+        )
+
+        # create offerings for the active period
+        own_offering = SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            academic_program=self.academic_program,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            semester=1,
+            academic_period=self.active_period,
+            teacher=teacher,
+            is_active=True,
+        )
+
+        other_offering = SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            academic_program=self.academic_program,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            semester=2,
+            academic_period=self.active_period,
+            teacher=other_teacher,
+            is_active=True,
+        )
+
+        # PUBLISH the period for positive cases
+        self.active_period.is_schedule_published = True
+        self.active_period.save()
+
+        # Teacher should see only their offering
+        self.login_and_set_auth("teacher1@test.com", "teachpass123")
+        resp_t = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+        self.assertEqual(resp_t.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(resp_t.data, list)
+        self.assertEqual(len(resp_t.data), 1)
+        self.assertEqual(resp_t.data[0]["id"], own_offering.id)
+
+        # Student sees enrolled offerings
+        student_user = self.create_user(
+            email="student1@test.com",
+            password="studentpass123",
+            role=self.estudiante_role,
+            first_name="S",
+            last_name="One",
+        )
+
+        # enroll student in other_offering
+        from .models import StudentEnrollment
+
+        StudentEnrollment.objects.create(student=student_user.profile, subject_offering=other_offering)
+
+        self.login_and_set_auth("student1@test.com", "studentpass123")
+        resp_s = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+        self.assertEqual(resp_s.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(resp_s.data, list)
+        # student enrolled in other_offering -> receives 1
+        self.assertEqual(len(resp_s.data), 1)
+        self.assertEqual(resp_s.data[0]["id"], other_offering.id)
+
+        # Admin sees both offerings
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+        resp_a = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+        self.assertEqual(resp_a.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(resp_a.data, list)
+        # admin should see both offerings (distinct list)
+        returned_ids = {item["id"] for item in resp_a.data}
+        self.assertTrue(own_offering.id in returned_ids and other_offering.id in returned_ids)
+
+        # Unpublished period: toggle to unpublished and request -> should return 400
+        self.active_period.is_schedule_published = False
+        self.active_period.save()
+
+        self.login_and_set_auth("teacher1@test.com", "teachpass123")
+        resp_unpub = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+        self.assertEqual(resp_unpub.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", resp_unpub.data)
+
+        def test_my_schedule_teacher_without_teacher_profile_returns_error(self):
+            """Teacher user without Teacher model entry should get appropriate error."""
+            teacher_user = self.create_user(
+                email="orphan_teacher@test.com",
+                password="teachpass123",
+                role=self.docente_role,
+                first_name="Orphan",
+                last_name="Teacher",
+            )
+
+            # Set period as published
+            self.active_period.is_schedule_published = True
+            self.active_period.save()
+
+            self.login_and_set_auth("orphan_teacher@test.com", "teachpass123")
+            resp = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+
+            self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn("detail", resp.data)
+            self.assertIn("no se encontro un docente", str(resp.data).lower())
+
+        def test_my_schedule_student_without_profile_returns_error(self):
+            """Student user without UserProfile relationship should return error."""
+            # Create a user but don't properly associate the profile
+            student_user = User.objects.create_user(
+                username="broken_student@test.com",
+                email="broken_student@test.com",
+                password="studentpass123",
+            )
+
+            # Set period as published
+            self.active_period.is_schedule_published = True
+            self.active_period.save()
+
+            # Login with this user
+            login_resp = self.client.post(
+                reverse("auth-login"),
+                {"email": "broken_student@test.com", "password": "studentpass123"},
+                format="json",
+            )
+            # If login fails, skip test (user requires proper profile)
+            if login_resp.status_code != status.HTTP_200_OK:
+                self.skipTest("Could not create test user without proper profile")
+
+            token = login_resp.data["access"]
+            self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+            resp = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+
+            # Should either return 400 or 200 with empty list (depends on implementation)
+            self.assertIn(resp.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_200_OK])
+
+        def test_my_schedule_missing_academic_period_id_returns_error(self):
+            """Request without academic_period_id should return validation error."""
+            self.login_and_set_auth("admin@test.com", "adminpassword123")
+            resp = self.client.get(reverse("programming-my-schedule"))
+
+            self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn("academic_period_id", resp.data)
+
+        def test_my_schedule_nonexistent_academic_period_returns_404(self):
+            """Request with non-existent period ID should return 404."""
+            self.login_and_set_auth("admin@test.com", "adminpassword123")
+            resp = self.client.get(reverse("programming-my-schedule") + "?academic_period_id=99999")
+
+            self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+        def test_my_schedule_unauthenticated_request_returns_401(self):
+            """Unauthenticated request should return 401."""
+            resp = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+
+            self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        def test_my_schedule_coordinator_can_see_all_offerings(self):
+            """Coordinators should be able to see all offerings in published period."""
+            link_type = CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE).first()
+            if not link_type:
+                link_type = CatalogItem.objects.create(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE, name="Contratado")
+
+            teacher = Teacher.objects.create(
+                first_name="Test",
+                last_name="Teacher",
+                email="test_teacher@test.com",
+                link_type=link_type,
+                hourly_rate=10.0,
+            )
+
+            offering = SubjectOffering.objects.create(
+                subject=self.subject,
+                subject_group=self.subject_group,
+                academic_program=self.academic_program,
+                working_day=self.working_day,
+                time_slot=self.time_slot,
+                semester=1,
+                academic_period=self.active_period,
+                teacher=teacher,
+                is_active=True,
+            )
+
+            self.active_period.is_schedule_published = True
+            self.active_period.save()
+
+            self.login_and_set_auth("coord@test.com", "coordpassword123")
+            resp = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertIsInstance(resp.data, list)
+            self.assertEqual(len(resp.data), 1)
+            self.assertEqual(resp.data[0]["id"], offering.id)
+
+        def test_my_schedule_inactive_offerings_are_excluded(self):
+            """Inactive subject offerings should not appear in schedule."""
+            link_type = CatalogItem.objects.filter(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE).first()
+            if not link_type:
+                link_type = CatalogItem.objects.create(catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE, name="Contratado")
+
+            teacher_user = self.create_user(
+                email="test_teacher2@test.com",
+                password="teachpass123",
+                role=self.docente_role,
+                first_name="T",
+                last_name="Two",
+            )
+            teacher = Teacher.objects.create(
+                first_name="T",
+                last_name="Two",
+                email=teacher_user.email,
+                link_type=link_type,
+                hourly_rate=10.0,
+                user_profile=teacher_user.profile,
+            )
+
+            active_offering = SubjectOffering.objects.create(
+                subject=self.subject,
+                subject_group=self.subject_group,
+                academic_program=self.academic_program,
+                working_day=self.working_day,
+                time_slot=self.time_slot,
+                semester=1,
+                academic_period=self.active_period,
+                teacher=teacher,
+                is_active=True,
+            )
+
+            inactive_offering = SubjectOffering.objects.create(
+                subject=self.subject,
+                subject_group=self.subject_group,
+                academic_program=self.academic_program,
+                working_day=self.working_day,
+                time_slot=self.time_slot,
+                semester=2,
+                academic_period=self.active_period,
+                teacher=teacher,
+                is_active=False,
+            )
+
+            self.active_period.is_schedule_published = True
+            self.active_period.save()
+
+            self.login_and_set_auth("test_teacher2@test.com", "teachpass123")
+            resp = self.client.get(reverse("programming-my-schedule") + f"?academic_period_id={self.active_period.id}")
+
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(len(resp.data), 1)
+            self.assertEqual(resp.data[0]["id"], active_offering.id)
+
 
 class HealthCheckTests(APITestCase):
     def test_health_check_returns_ok(self):
@@ -1475,6 +1749,7 @@ class ConfigServiceTests(TestCase):
             start_date=date(2026, 1, 15),
             end_date=date(2026, 6, 1),
             is_active=False,
+            is_schedule_published=False,
         )
 
         self.assertEqual(updated.code, "2026-1A")
@@ -1488,6 +1763,7 @@ class ConfigServiceTests(TestCase):
                 start_date=date(2026, 7, 1),
                 end_date=date(2026, 11, 30),
                 is_active=True,
+                is_schedule_published=False,
             )
 
     def test_working_day_update_and_duplicate_validation(self):

@@ -30,6 +30,9 @@ from .views import (
     SubjectGroupListCreateAPIView,
     SubjectOfferingDetailAPIView,
     SubjectOfferingListCreateAPIView,
+    ScheduleAcademicPeriodListAPIView,
+    MyScheduleAPIView,
+    StudentEnrollmentListCreateAPIView,
     TeacherDetailAPIView,
     TeacherListCreateAPIView,
     TimeSlotDetailAPIView,
@@ -60,6 +63,11 @@ urlpatterns = [
         "config/periods/<int:config_id>/",
         AcademicPeriodDetailAPIView.as_view(),
         name="config-periods-detail",
+    ),
+    path(
+        "programming/periods/",
+        ScheduleAcademicPeriodListAPIView.as_view(),
+        name="programming-periods-list",
     ),
     path(
         "config/working-days/",
@@ -167,5 +175,15 @@ urlpatterns = [
         "programming/subject-offerings/<int:subject_offering_id>/",
         SubjectOfferingDetailAPIView.as_view(),
         name="programming-subject-offerings-detail",
+    ),
+    path(
+        "programming/my-schedule/",
+        MyScheduleAPIView.as_view(),
+        name="programming-my-schedule",
+    ),
+    path(
+        "programming/student-enrollments/",
+        StudentEnrollmentListCreateAPIView.as_view(),
+        name="programming-student-enrollments",
     ),
 ]

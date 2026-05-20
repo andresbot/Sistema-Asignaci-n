@@ -43,7 +43,9 @@ class AcademicPeriod(TimeStampedModel):
     start_date = models.DateField()
     end_date = models.DateField()
     is_active = models.BooleanField(default=True)
+    is_schedule_published = models.BooleanField(default=False)
     schedule_generated_at = models.DateTimeField(null=True, blank=True)
+    schedule_published_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-start_date"]
@@ -220,6 +222,13 @@ class Teacher(TimeStampedModel):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
+    user_profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        related_name="teacher_profile",
+        null=True,
+        blank=True,
+    )
     link_type = models.ForeignKey(
         CatalogItem,
         on_delete=models.PROTECT,
@@ -240,6 +249,28 @@ class Teacher(TimeStampedModel):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+
+class StudentEnrollment(TimeStampedModel):
+    student = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="enrollments")
+    subject_offering = models.ForeignKey(
+        "SubjectOffering",
+        on_delete=models.CASCADE,
+        related_name="student_enrollments",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["student__last_name", "student__first_name", "subject_offering_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "subject_offering"],
+                name="unique_student_enrollment",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.student} - {self.subject_offering}"
 
 
 class Course(TimeStampedModel):

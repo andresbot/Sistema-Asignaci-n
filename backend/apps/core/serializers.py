@@ -15,6 +15,7 @@ from .models import (
     Subject,
     SubjectGroup,
     SubjectOffering,
+    StudentEnrollment,
     Teacher,
     TimeSlot,
     UserProfile,
@@ -300,7 +301,9 @@ class AcademicPeriodSerializer(serializers.ModelSerializer):
             "start_date",
             "end_date",
             "is_active",
+            "is_schedule_published",
             "schedule_generated_at",
+            "schedule_published_at",
         ]
 
     def create(self, validated_data):
@@ -316,6 +319,9 @@ class AcademicPeriodSerializer(serializers.ModelSerializer):
             "start_date": validated_data.get("start_date", instance.start_date),
             "end_date": validated_data.get("end_date", instance.end_date),
             "is_active": validated_data.get("is_active", instance.is_active),
+            "is_schedule_published": validated_data.get(
+                "is_schedule_published", instance.is_schedule_published
+            ),
         }
 
         try:
@@ -565,6 +571,14 @@ class AcademicProgramSerializer(serializers.ModelSerializer):
 class TeacherSerializer(serializers.ModelSerializer):
     link_type = CatalogItemSerializer(read_only=True)
     link_type_id = serializers.PrimaryKeyRelatedField(source="link_type", queryset=CatalogItem.objects.all())
+    user_profile_id = serializers.PrimaryKeyRelatedField(
+        source="user_profile",
+        queryset=UserProfile.objects.select_related("role").all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    user_profile = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Teacher
@@ -573,6 +587,8 @@ class TeacherSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "email",
+            "user_profile",
+            "user_profile_id",
             "link_type",
             "link_type_id",
             "hourly_rate",
@@ -583,6 +599,66 @@ class TeacherSerializer(serializers.ModelSerializer):
         if link_type.catalog_type != CatalogItem.CatalogType.TEACHER_LINK_TYPE:
             raise serializers.ValidationError("El tipo de vinculacion docente no es valido.")
         return link_type
+
+    def get_user_profile(self, obj):
+        profile = getattr(obj, "user_profile", None)
+        if not profile:
+            return None
+        return {
+            "id": profile.id,
+            "email": profile.email,
+            "first_name": profile.first_name,
+            "last_name": profile.last_name,
+            "role": profile.role.name if profile.role else None,
+        }
+
+
+class StudentEnrollmentSerializer(serializers.ModelSerializer):
+    student = UserProfileReadSerializer(read_only=True)
+    student_id = serializers.PrimaryKeyRelatedField(
+        source="student",
+        queryset=UserProfile.objects.select_related("role").all(),
+        write_only=True,
+    )
+    subject_offering = SubjectOfferingSerializer(read_only=True)
+    subject_offering_id = serializers.PrimaryKeyRelatedField(
+        source="subject_offering",
+        queryset=SubjectOffering.objects.select_related("academic_period").all(),
+        write_only=True,
+    )
+
+    class Meta:
+        model = StudentEnrollment
+        fields = [
+            "id",
+            "student",
+            "student_id",
+            "subject_offering",
+            "subject_offering_id",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_student_id(self, student):
+        if not student.role or student.role.name.strip().lower() != "estudiante":
+            raise serializers.ValidationError("La cuenta seleccionada no tiene rol de estudiante.")
+        return student
+
+    def validate(self, attrs):
+        student = attrs.get("student", getattr(self.instance, "student", None))
+        subject_offering = attrs.get("subject_offering", getattr(self.instance, "subject_offering", None))
+
+        if student and subject_offering:
+            duplicate = StudentEnrollment.objects.filter(student=student, subject_offering=subject_offering)
+            if self.instance is not None:
+                duplicate = duplicate.exclude(id=self.instance.id)
+            if duplicate.exists():
+                raise serializers.ValidationError(
+                    {"non_field_errors": ["Ya existe una matricula para este estudiante y horario."]}
+                )
+
+        return attrs
 
 
 class CourseSerializer(serializers.ModelSerializer):
