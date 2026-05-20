@@ -1,4 +1,5 @@
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.core.models import (
     AcademicPeriod,
@@ -176,13 +177,14 @@ def create_academic_period(*, code, name, start_date, end_date, is_active=True):
             start_date=start_date,
             end_date=end_date,
             is_active=is_active,
+            is_schedule_published=False,
         )
     except IntegrityError as exc:
         raise ConfigValidationError("Ya existe un periodo con ese codigo.", field="code") from exc
 
 
 @transaction.atomic
-def update_academic_period(period, *, code, name, start_date, end_date, is_active):
+def update_academic_period(period, *, code, name, start_date, end_date, is_active, is_schedule_published):
     normalized_code = _normalize_required_code(code)
     normalized_name = _normalize_required_text(
         name,
@@ -197,6 +199,11 @@ def update_academic_period(period, *, code, name, start_date, end_date, is_activ
     period.start_date = start_date
     period.end_date = end_date
     period.is_active = is_active
+    period.is_schedule_published = is_schedule_published
+    if is_schedule_published and period.schedule_published_at is None:
+        period.schedule_published_at = timezone.now()
+    elif not is_schedule_published:
+        period.schedule_published_at = None
 
     try:
         period.save()

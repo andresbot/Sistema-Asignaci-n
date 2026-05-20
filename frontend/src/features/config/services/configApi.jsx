@@ -298,6 +298,16 @@ export function listSubjectOfferings(token) {
   return coreApiRequest("/programming/subject-offerings/", { token });
 }
 
+export function listSchedulePeriods(token) {
+  return coreApiRequest("/programming/periods/", { token });
+}
+
+export function fetchMySchedule(token, academicPeriodId) {
+  return coreApiRequest(`/programming/my-schedule/?academic_period_id=${academicPeriodId}`, {
+    token,
+  });
+}
+
 export function createSubjectOffering(token, payload) {
   return coreApiRequest("/programming/subject-offerings/", {
     method: "POST",

@@ -23,6 +23,7 @@ from .models import (
     Subject,
     SubjectGroup,
     SubjectOffering,
+    StudentEnrollment,
     Teacher,
     TimeSlot,
     UserProfile,
@@ -44,6 +45,7 @@ from .serializers import (
     SubjectGroupSerializer,
     SubjectOfferingSerializer,
     SubjectSerializer,
+    StudentEnrollmentSerializer,
     TeacherSerializer,
     TimeSlotSerializer,
     UserCreateSerializer,
@@ -348,6 +350,15 @@ class AcademicPeriodDetailAPIView(ConfigDetailBaseAPIView):
     serializer_class = AcademicPeriodSerializer
 
 
+class ScheduleAcademicPeriodListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, _request):
+        queryset = AcademicPeriod.objects.filter(is_active=True).order_by("-start_date", "-id")
+        serializer = AcademicPeriodSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+
 class WorkingDayListCreateAPIView(CoordinatorReadableConfigListCreateAPIView):
     queryset = WorkingDay.objects.order_by("day_of_week")
     serializer_class = WorkingDaySerializer
@@ -532,6 +543,86 @@ class SubjectOfferingDetailAPIView(CoordinatorProtectedAPIView):
         instance = self.get_object(subject_offering_id)
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MyScheduleAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        academic_period_id = request.query_params.get("academic_period_id")
+        if not academic_period_id:
+            raise ValidationError({"academic_period_id": "Debes seleccionar un periodo academico."})
+
+        academic_period = get_object_or_404(AcademicPeriod, id=academic_period_id)
+        if not academic_period.is_schedule_published:
+            raise ValidationError({"detail": "El horario de este periodo aun no ha sido publicado."})
+
+        role_name = get_user_role_name(request.user)
+        queryset = SubjectOffering.objects.select_related(
+            "subject",
+            "subject_group",
+            "working_day",
+            "time_slot",
+            "required_space_type",
+            "teacher",
+            "teacher__user_profile",
+            "academic_program",
+            "academic_period",
+        ).filter(academic_period=academic_period, is_active=True)
+
+        if role_name == "docente":
+            teacher = (
+                Teacher.objects.select_related("user_profile")
+                .filter(user_profile__user=request.user)
+                .first()
+                or Teacher.objects.filter(email__iexact=request.user.email).first()
+            )
+            if teacher is None:
+                raise ValidationError({"detail": "No se encontro un docente asociado a su cuenta."})
+            queryset = queryset.filter(teacher=teacher)
+        elif role_name == "estudiante":
+            profile = getattr(request.user, "profile", None)
+            if profile is None:
+                raise ValidationError({"detail": "No se encontro un perfil de estudiante asociado a su cuenta."})
+
+            queryset = queryset.filter(
+                student_enrollments__student=profile,
+                student_enrollments__is_active=True,
+            )
+        elif role_name in {"administrador", "coordinador"} or request.user.is_superuser:
+            queryset = queryset
+        else:
+            raise ValidationError({"detail": "Rol no habilitado para consultar horarios."})
+
+        serializer = SubjectOfferingSerializer(queryset.distinct(), many=True)
+        return Response(serializer.data)
+
+
+class StudentEnrollmentListCreateAPIView(AdminProtectedAPIView):
+    def get_queryset(self):
+        return StudentEnrollment.objects.select_related(
+            "student",
+            "student__role",
+            "student__user",
+            "subject_offering",
+            "subject_offering__subject",
+            "subject_offering__subject_group",
+            "subject_offering__working_day",
+            "subject_offering__time_slot",
+            "subject_offering__academic_program",
+            "subject_offering__academic_period",
+            "subject_offering__teacher",
+        ).order_by("student__last_name", "student__first_name", "subject_offering_id")
+
+    def get(self, _request):
+        serializer = StudentEnrollmentSerializer(self.get_queryset(), many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = StudentEnrollmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(StudentEnrollmentSerializer(instance).data, status=status.HTTP_201_CREATED)
 
 
 class TeacherListCreateAPIView(CoordinatorProtectedAPIView):

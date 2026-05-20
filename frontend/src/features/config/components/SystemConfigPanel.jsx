@@ -124,6 +124,7 @@ const SECTION_DEFINITIONS = {
       { name: "name", label: "Nombre", type: "text", required: true },
       { name: "start_date", label: "Fecha inicio", type: "date", required: true },
       { name: "end_date", label: "Fecha fin", type: "date", required: true },
+      { name: "is_schedule_published", label: "Horario publicado", type: "checkbox", required: false },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
@@ -387,7 +388,8 @@ function buildItemSummary(sectionKey, item) {
   }
 
   if (sectionKey === "periods") {
-    return `${item.code} | ${item.start_date} a ${item.end_date}`;
+    const publishState = item.is_schedule_published ? "Publicado" : "Borrador";
+    return `${item.code} | ${item.start_date} a ${item.end_date} | ${publishState}`;
   }
 
   if (sectionKey === "workingDays") {
@@ -457,6 +459,9 @@ export function SystemConfigPanel({
   onDelete,
   onCancel,
   visibleSections,
+  title = "Configuracion general del sistema",
+  description,
+  showImportSection = true,
 }) {
   const sectionEntries = Object.entries(SECTION_DEFINITIONS).filter(([sectionKey]) => {
     if (!visibleSections || visibleSections.length === 0) {
@@ -471,7 +476,8 @@ export function SystemConfigPanel({
       <header className="dashboard-header config-header">
         <div>
           <p className="eyebrow"></p>
-          <h2>Configuracion general del sistema</h2>
+          <h2>{title}</h2>
+          {description ? <p className="lead compact">{description}</p> : null}
         </div>
         <button className="secondary" onClick={onRefresh}>
           Recargar configuracion
@@ -496,69 +502,71 @@ export function SystemConfigPanel({
         ))}
       </div>
 
-      <article className="card-block config-card">
-        <h2>Importacion masiva</h2>
+      {showImportSection ? (
+        <article className="card-block config-card">
+          <h2>Importacion masiva</h2>
 
-        <form className="form-grid" onSubmit={onImportSubmit}>
-          <label>
-            Tipo de dato maestro
-            <select
-              value={importState.selectedResourceType}
-              onChange={(event) =>
-                onImportFieldChange("selectedResourceType", event.target.value)
-              }
-            >
-              {importState.templates.map((template) => (
-                <option key={template.resource_type} value={template.resource_type}>
-                  {template.resource_type}
-                </option>
-              ))}
-            </select>
-          </label>
+          <form className="form-grid" onSubmit={onImportSubmit}>
+            <label>
+              Tipo de dato maestro
+              <select
+                value={importState.selectedResourceType}
+                onChange={(event) =>
+                  onImportFieldChange("selectedResourceType", event.target.value)
+                }
+              >
+                {importState.templates.map((template) => (
+                  <option key={template.resource_type} value={template.resource_type}>
+                    {template.resource_type}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label>
-            Archivo CSV/XLSX
-            <input
-              type="file"
-              accept=".csv,.xlsx"
-              onChange={(event) =>
-                onImportFieldChange("file", event.target.files?.[0] || null)
-              }
-            />
-          </label>
+            <label>
+              Archivo CSV/XLSX
+              <input
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={(event) =>
+                  onImportFieldChange("file", event.target.files?.[0] || null)
+                }
+              />
+            </label>
 
-          {importState.error ? <p className="error-text">{importState.error}</p> : null}
+            {importState.error ? <p className="error-text">{importState.error}</p> : null}
 
-          <div className="actions-inline">
-            <button type="button" className="secondary" onClick={onDownloadTemplate}>
-              Descargar plantilla CSV
-            </button>
-            <button type="submit" disabled={importState.submitting}>
-              {importState.submitting ? "Importando..." : "Importar"}
-            </button>
-          </div>
-        </form>
+            <div className="actions-inline">
+              <button type="button" className="secondary" onClick={onDownloadTemplate}>
+                Descargar plantilla CSV
+              </button>
+              <button type="submit" disabled={importState.submitting}>
+                {importState.submitting ? "Importando..." : "Importar"}
+              </button>
+            </div>
+          </form>
 
-        {importState.result ? (
-          <div className="config-items-list">
-            <p className="hint">
-              Total: {importState.result.total_processed} | Exitosos: {importState.result.successful} |
-              Fallidos: {importState.result.failed}
-            </p>
+          {importState.result ? (
+            <div className="config-items-list">
+              <p className="hint">
+                Total: {importState.result.total_processed} | Exitosos: {importState.result.successful} |
+                Fallidos: {importState.result.failed}
+              </p>
 
-            {importState.result.rows.map((row) => (
-              <div key={`${row.row}-${row.status}-${row.message}`} className="config-item-row">
-                <div>
-                  <strong>Fila {row.row}</strong>
-                  <p className="hint small">
-                    {row.status === "success" ? "OK" : "Error"}: {row.message}
-                  </p>
+              {importState.result.rows.map((row) => (
+                <div key={`${row.row}-${row.status}-${row.message}`} className="config-item-row">
+                  <div>
+                    <strong>Fila {row.row}</strong>
+                    <p className="hint small">
+                      {row.status === "success" ? "OK" : "Error"}: {row.message}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </article>
+              ))}
+            </div>
+          ) : null}
+        </article>
+      ) : null}
     </section>
   );
 }

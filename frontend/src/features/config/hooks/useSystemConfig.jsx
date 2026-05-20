@@ -168,9 +168,10 @@ const RESOURCE_CONFIG = {
       name: "",
       start_date: "",
       end_date: "",
+      is_schedule_published: false,
       is_active: true,
     },
-    fieldOrder: ["code", "name", "start_date", "end_date", "is_active"],
+    fieldOrder: ["code", "name", "start_date", "end_date", "is_schedule_published", "is_active"],
   },
   workingDays: {
     list: listWorkingDays,
