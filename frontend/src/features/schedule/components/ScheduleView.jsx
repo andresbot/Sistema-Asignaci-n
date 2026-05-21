@@ -2,16 +2,23 @@ import { useSchedule } from "../hooks/useSchedule";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { UnassignedList } from "./UnassignedList";
 
+const SEMESTER_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 export function ScheduleView({ authToken, periodos }) {
   const {
     campuses,
+    programs,
     assignments,
     unassigned,
     campusId,
+    programId,
+    semester,
     periodoId,
     loading,
     error,
     setCampusId,
+    setProgramId,
+    setSemester,
     setPeriodoId,
     reload,
   } = useSchedule({ authToken, periodos, enabled: true });
@@ -45,12 +52,40 @@ export function ScheduleView({ authToken, periodos }) {
         </label>
 
         <label>
-          Sede (campus)
+          Sede
           <select value={campusId} onChange={(e) => setCampusId(e.target.value)}>
             <option value="">Todas las sedes</option>
             {campuses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Programa
+          <select
+            value={programId}
+            onChange={(e) => setProgramId(e.target.value)}
+            disabled={programs.length === 0}
+          >
+            <option value="">Todos los programas</option>
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Semestre
+          <select value={semester} onChange={(e) => setSemester(e.target.value)}>
+            <option value="">Todos los semestres</option>
+            {SEMESTER_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                Semestre {s}
               </option>
             ))}
           </select>

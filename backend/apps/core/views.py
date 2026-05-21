@@ -787,11 +787,17 @@ class HorarioAPIView(AdminProtectedAPIView):
 
         period_id = request.query_params.get("period_id")
         campus_id = request.query_params.get("campus_id")
+        program_id = request.query_params.get("program_id")
+        semester = request.query_params.get("semester")
 
         if period_id:
             queryset = queryset.filter(academic_period_id=period_id)
         if campus_id:
             queryset = queryset.filter(academic_program__campus_id=campus_id)
+        if program_id:
+            queryset = queryset.filter(academic_program_id=program_id)
+        if semester:
+            queryset = queryset.filter(semester=semester)
 
         serializer = HorarioOfferingSerializer(queryset, many=True)
         return Response({"assignments": serializer.data})
@@ -806,8 +812,18 @@ class HorarioNoAsignadasAPIView(AdminProtectedAPIView):
         )
 
         period_id = request.query_params.get("period_id")
+        campus_id = request.query_params.get("campus_id")
+        program_id = request.query_params.get("program_id")
+        semester = request.query_params.get("semester")
+
         if period_id:
             queryset = queryset.filter(academic_period_id=period_id)
+        if campus_id:
+            queryset = queryset.filter(academic_program__campus_id=campus_id)
+        if program_id:
+            queryset = queryset.filter(academic_program_id=program_id)
+        if semester:
+            queryset = queryset.filter(semester=semester)
 
         serializer = HorarioUnassignedSerializer(queryset, many=True)
         return Response({"unassigned": serializer.data})

@@ -711,6 +711,25 @@ tbody td:last-child {
   font-size: 0.8rem;
 }
 
+@media (max-width: 900px) {
+  .schedule-filters {
+    flex-direction: column;
+  }
+
+  .schedule-filters label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .schedule-chip__subject {
+    font-size: 0.8rem;
+  }
+
+  .schedule-chip__meta {
+    font-size: 0.72rem;
+  }
+}
+
 @media (max-width: 640px) {
   .hero-card {
     padding: 24px;
