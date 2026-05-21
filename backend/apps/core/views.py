@@ -39,6 +39,8 @@ from .serializers import (
     ClassroomSerializer,
     CourseGroupSerializer,
     CourseSerializer,
+    HorarioOfferingSerializer,
+    HorarioUnassignedSerializer,
     LoginSerializer,
     RoleSerializer,
     SpaceTypeSerializer,
@@ -763,3 +765,49 @@ class MasterDataImportAPIView(APIView):
             raise ValidationError({"file": str(exc)}) from exc
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class HorarioAPIView(AdminProtectedAPIView):
+    def get(self, request):
+        queryset = (
+            SubjectOffering.objects.select_related(
+                "working_day",
+                "time_slot",
+                "subject",
+                "teacher",
+                "subject_group",
+                "assigned_classroom",
+                "assigned_classroom__campus",
+                "academic_period",
+                "academic_program__campus",
+            )
+            .filter(working_day__isnull=False, time_slot__isnull=False)
+            .order_by("working_day__day_of_week", "time_slot__start_time")
+        )
+
+        period_id = request.query_params.get("period_id")
+        campus_id = request.query_params.get("campus_id")
+
+        if period_id:
+            queryset = queryset.filter(academic_period_id=period_id)
+        if campus_id:
+            queryset = queryset.filter(academic_program__campus_id=campus_id)
+
+        serializer = HorarioOfferingSerializer(queryset, many=True)
+        return Response({"assignments": serializer.data})
+
+
+class HorarioNoAsignadasAPIView(AdminProtectedAPIView):
+    def get(self, request):
+        queryset = (
+            SubjectOffering.objects.select_related("subject", "subject_group", "academic_period")
+            .filter(working_day__isnull=True)
+            .order_by("subject__name")
+        )
+
+        period_id = request.query_params.get("period_id")
+        if period_id:
+            queryset = queryset.filter(academic_period_id=period_id)
+
+        serializer = HorarioUnassignedSerializer(queryset, many=True)
+        return Response({"unassigned": serializer.data})

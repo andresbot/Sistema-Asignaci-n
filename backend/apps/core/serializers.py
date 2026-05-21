@@ -730,3 +730,71 @@ class ClassroomSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("La capacidad debe ser mayor a cero.")
         return value
+
+
+class HorarioOfferingSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para la grilla de horario del administrador."""
+
+    working_day = WorkingDaySerializer(read_only=True)
+    time_slot = TimeSlotSerializer(read_only=True)
+    asignatura = serializers.SerializerMethodField()
+    docente = serializers.SerializerMethodField()
+    grupo = serializers.SerializerMethodField()
+    espacio = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectOffering
+        fields = ["id", "working_day", "time_slot", "asignatura", "docente", "grupo", "espacio"]
+
+    def get_asignatura(self, obj):
+        return {"id": obj.subject.id, "code": obj.subject.code, "name": obj.subject.name}
+
+    def get_docente(self, obj):
+        if not obj.teacher:
+            return None
+        return {
+            "id": obj.teacher.id,
+            "first_name": obj.teacher.first_name,
+            "last_name": obj.teacher.last_name,
+        }
+
+    def get_grupo(self, obj):
+        if not obj.subject_group:
+            return None
+        return {"id": obj.subject_group.id, "name": obj.subject_group.identifier}
+
+    def get_espacio(self, obj):
+        if not obj.assigned_classroom:
+            return None
+        campus = obj.assigned_classroom.campus
+        return {
+            "id": obj.assigned_classroom.id,
+            "name": obj.assigned_classroom.name,
+            "sede": {"id": campus.id, "name": campus.name} if campus else None,
+        }
+
+
+class HorarioUnassignedSerializer(serializers.ModelSerializer):
+    """Serializer para asignaturas que el algoritmo no pudo programar."""
+
+    asignatura = serializers.SerializerMethodField()
+    grupo = serializers.SerializerMethodField()
+    razon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectOffering
+        fields = ["id", "asignatura", "grupo", "razon"]
+
+    def get_asignatura(self, obj):
+        return {"id": obj.subject.id, "code": obj.subject.code, "name": obj.subject.name}
+
+    def get_grupo(self, obj):
+        if not obj.subject_group:
+            return {"id": None, "name": "Sin grupo"}
+        return {"id": obj.subject_group.id, "name": obj.subject_group.identifier}
+
+    def get_razon(self, obj):
+        if obj.schedule_failure_reason:
+            return obj.schedule_failure_reason
+        from .services.programming_service import get_offering_non_assignable_reason
+        return get_offering_non_assignable_reason(obj) or "Razon no especificada."

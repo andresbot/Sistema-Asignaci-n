@@ -9,12 +9,14 @@ import { ImportManagementPanel } from "./features/config/components/ImportManage
 import { SystemConfigPanel } from "./features/config/components/SystemConfigPanel";
 import { useSystemConfig } from "./features/config/hooks/useSystemConfig";
 import { ScheduleConsultationPanel } from "./features/schedule/components/ScheduleConsultationPanel";
+import { ScheduleView } from "./features/schedule/components/ScheduleView";
 import { UsersDashboard } from "./features/users/components/UsersDashboard";
 import { useUsersManagement } from "./features/users/hooks/useUsersManagement";
 import { coreApiBase } from "./shared/api/coreApiClient";
 
 const ADMIN_SECTIONS = [
   { key: "inicio", label: "Inicio" },
+  { key: "horario", label: "Horario" },
   { key: "usuarios", label: "Usuarios" },
   { key: "configuracion", label: "Configuracion" },
   { key: "importacion", label: "Importacion" },
@@ -217,6 +219,13 @@ function App() {
               sectionCount={sectionItems.length}
               isAdmin={isAdmin}
               isCoordinator={isCoordinator}
+            />
+          ) : null}
+
+          {activeSectionItem?.key === "horario" ? (
+            <ScheduleView
+              authToken={authToken}
+              periodos={configState.periods?.items ?? []}
             />
           ) : null}
 

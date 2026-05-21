@@ -69,7 +69,6 @@ class Subject(TimeStampedModel):
     ]
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=120)
-    # Legacy static field kept for backward compatibility. New dynamic catalog field below.
     class_type = models.CharField(max_length=20, choices=CLASS_TYPE_CHOICES)
     class_type_item = models.ForeignKey(
         "CatalogItem",
@@ -386,6 +385,14 @@ class SubjectOffering(TimeStampedModel):
         null=True,
         blank=True,
     )
+    assigned_classroom = models.ForeignKey(
+        Classroom,
+        on_delete=models.SET_NULL,
+        related_name="subject_offerings",
+        null=True,
+        blank=True,
+    )
+    schedule_failure_reason = models.TextField(null=True, blank=True)
     student_count = models.PositiveIntegerField(null=True, blank=True)
     academic_program = models.ForeignKey(
         AcademicProgram, on_delete=models.PROTECT, related_name="subject_offerings"

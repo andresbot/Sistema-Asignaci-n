@@ -17,6 +17,8 @@ from .views import (
     CourseGroupDetailAPIView,
     CourseGroupListCreateAPIView,
     CourseListCreateAPIView,
+    HorarioAPIView,
+    HorarioNoAsignadasAPIView,
     LoginAPIView,
     LogoutAPIView,
     MasterDataImportAPIView,
@@ -186,4 +188,6 @@ urlpatterns = [
         StudentEnrollmentListCreateAPIView.as_view(),
         name="programming-student-enrollments",
     ),
+    path("horario/", HorarioAPIView.as_view(), name="horario"),
+    path("horario/no-asignadas/", HorarioNoAsignadasAPIView.as_view(), name="horario-no-asignadas"),
 ]
