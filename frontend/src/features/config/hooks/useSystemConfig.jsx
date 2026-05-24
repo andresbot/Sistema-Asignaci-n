@@ -142,6 +142,7 @@ const RESOURCE_CONFIG = {
       required_space_type_id: "",
       teacher_id: "",
       student_count: "",
+      requires_accessible_classroom: false,
       semester: "",
       is_active: true,
     },
@@ -154,6 +155,7 @@ const RESOURCE_CONFIG = {
       "required_space_type_id",
       "teacher_id",
       "student_count",
+      "requires_accessible_classroom",
       "semester",
       "is_active",
     ],
@@ -505,6 +507,7 @@ function normalizePayload(resourceKey, form) {
       required_space_type_id: form.required_space_type_id ? Number(form.required_space_type_id) : null,
       teacher_id: form.teacher_id ? Number(form.teacher_id) : null,
       student_count: form.student_count !== "" && form.student_count !== null ? Number(form.student_count) : null,
+      requires_accessible_classroom: Boolean(form.requires_accessible_classroom),
       semester: Number(form.semester),
     };
   }
@@ -591,6 +594,7 @@ function mapItemToForm(resourceKey, item) {
     form.required_space_type_id = String(item.required_space_type?.id ?? item.required_space_type_id ?? "");
     form.teacher_id = String(item.teacher?.id ?? item.teacher_id ?? "");
     form.student_count = item.student_count !== null && item.student_count !== undefined ? String(item.student_count) : "";
+    form.requires_accessible_classroom = Boolean(item.requires_accessible_classroom);
     form.semester = String(item.semester);
   }
 

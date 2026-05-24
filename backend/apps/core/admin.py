@@ -83,6 +83,7 @@ class SubjectOfferingAdmin(admin.ModelAdmin):
         "academic_program",
         "academic_period",
         "semester",
+        "requires_accessible_classroom",
         "is_active",
     )
     search_fields = (
@@ -93,7 +94,14 @@ class SubjectOfferingAdmin(admin.ModelAdmin):
         "academic_program__code",
         "academic_period__code",
     )
-    list_filter = ("is_active", "working_day", "time_slot", "academic_period", "academic_program")
+    list_filter = (
+        "is_active",
+        "working_day",
+        "time_slot",
+        "academic_period",
+        "academic_program",
+        "requires_accessible_classroom",
+    )
 
 
 @admin.register(TimeSlot)

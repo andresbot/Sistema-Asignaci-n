@@ -445,6 +445,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
     academic_period = AcademicPeriodSerializer(read_only=True)
     edit_warning = serializers.SerializerMethodField(read_only=True)
     non_assignable_reason = serializers.SerializerMethodField(read_only=True)
+    requires_accessible_classroom = serializers.BooleanField(required=False)
     subject_id = serializers.PrimaryKeyRelatedField(
         source="subject", queryset=Subject.objects.all(), write_only=True
     )
@@ -491,6 +492,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "required_space_type_id",
             "teacher",
             "teacher_id",
+            "requires_accessible_classroom",
             "student_count",
             "non_assignable_reason",
             "academic_program_id",
@@ -521,6 +523,9 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "time_slot": validated_data.get("time_slot", instance.time_slot),
             "required_space_type": validated_data.get("required_space_type", instance.required_space_type),
             "teacher": validated_data.get("teacher", instance.teacher),
+            "requires_accessible_classroom": validated_data.get(
+                "requires_accessible_classroom", instance.requires_accessible_classroom
+            ),
             "student_count": validated_data.get("student_count", instance.student_count),
             "academic_program": validated_data.get("academic_program", instance.academic_program),
             "academic_period": validated_data.get("academic_period", instance.academic_period),

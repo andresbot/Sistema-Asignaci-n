@@ -393,6 +393,7 @@ class SubjectOffering(TimeStampedModel):
         blank=True,
     )
     schedule_failure_reason = models.TextField(null=True, blank=True)
+    requires_accessible_classroom = models.BooleanField(default=False)
     student_count = models.PositiveIntegerField(null=True, blank=True)
     academic_program = models.ForeignKey(
         AcademicProgram, on_delete=models.PROTECT, related_name="subject_offerings"

@@ -113,6 +113,12 @@ const SECTION_DEFINITIONS = {
         optionsFrom: "teachers",
       },
       { name: "student_count", label: "Cupo matriculado", type: "number", required: false, min: 0 },
+      {
+        name: "requires_accessible_classroom",
+        label: "Estudiantes con discapacidad",
+        type: "checkbox",
+        required: false,
+      },
       { name: "semester", label: "Semestre", type: "number", required: true, min: 1 },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
@@ -382,9 +388,10 @@ function buildItemSummary(sectionKey, item) {
     const teacher = item.teacher
       ? `${item.teacher.first_name} ${item.teacher.last_name}`.trim()
       : "Sin docente";
+    const accessibility = item.requires_accessible_classroom ? "Requiere accesibilidad" : "Sin restriccion de accesibilidad";
 
     const cupo = item.student_count !== null && item.student_count !== undefined ? `Cupo ${item.student_count}` : "Sin cupo";
-    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | S${item.semester} | ${spaceType} | ${teacher} | ${cupo}`;
+    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | S${item.semester} | ${spaceType} | ${teacher} | ${cupo} | ${accessibility}`;
   }
 
   if (sectionKey === "periods") {

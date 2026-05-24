@@ -44,6 +44,7 @@ from .services.config_service import (
 from .services.programming_service import (
     check_classrooms_available_for_space_type,
     create_subject_offering,
+    get_offering_non_assignable_reason,
 )
 from .services.user_service import (
     UserEmailAlreadyExistsError,
@@ -370,6 +371,7 @@ class ProgrammingTests(BaseAuthTestCase):
                 "working_day_id": self.working_day.id,
                 "time_slot_id": self.time_slot.id,
                 "semester": 4,
+                "requires_accessible_classroom": True,
             },
             format="json",
         )
@@ -377,6 +379,52 @@ class ProgrammingTests(BaseAuthTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["academic_period"]["id"], self.active_period.id)
         self.assertEqual(response.data["semester"], 4)
+        self.assertTrue(response.data["requires_accessible_classroom"])
+
+    def test_accessible_classroom_requirement_is_respected(self):
+        accessible_space_type = CatalogItem.objects.create(
+            catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE,
+            name="Aula Accesible HU20",
+        )
+        accessible_classroom = Classroom.objects.create(
+            code="ACC-01",
+            name="Salon Accesible 1",
+            campus=self.campus,
+            space_type=accessible_space_type,
+            capacity=45,
+            is_accessible=True,
+            is_active=True,
+        )
+        Classroom.objects.create(
+            code="NOACC-01",
+            name="Salon No Accesible 1",
+            campus=self.campus,
+            space_type=accessible_space_type,
+            capacity=60,
+            is_accessible=False,
+            is_active=True,
+        )
+
+        offering = create_subject_offering(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            semester=5,
+            student_count=30,
+            requires_accessible_classroom=True,
+        )
+
+        self.assertIsNone(get_offering_non_assignable_reason(offering))
+
+        accessible_classroom.delete()
+        offering.refresh_from_db()
+
+        reason = get_offering_non_assignable_reason(offering)
+        self.assertIsNotNone(reason)
+        self.assertIn("accesible", reason.lower())
 
     def test_subject_offering_rejects_inactive_working_day(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")

@@ -160,7 +160,15 @@ def _calculate_difficulty(*, weekly_hours, capacity):
 
 
 @transaction.atomic
-def create_academic_period(*, code, name, start_date, end_date, is_active=True):
+def create_academic_period(
+    *,
+    code,
+    name,
+    start_date,
+    end_date,
+    is_active=True,
+    is_schedule_published=False,
+):
     normalized_code = _normalize_required_code(code)
     normalized_name = _normalize_required_text(
         name,
@@ -171,13 +179,15 @@ def create_academic_period(*, code, name, start_date, end_date, is_active=True):
     _ensure_period_code_unique(normalized_code)
 
     try:
+        published_at = timezone.now() if is_schedule_published else None
         return AcademicPeriod.objects.create(
             code=normalized_code,
             name=normalized_name,
             start_date=start_date,
             end_date=end_date,
             is_active=is_active,
-            is_schedule_published=False,
+            is_schedule_published=is_schedule_published,
+            schedule_published_at=published_at,
         )
     except IntegrityError as exc:
         raise ConfigValidationError("Ya existe un periodo con ese codigo.", field="code") from exc
