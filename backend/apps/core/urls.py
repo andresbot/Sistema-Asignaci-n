@@ -5,6 +5,8 @@ from .views import (
     AdminOnlyAPIView,
     AcademicPeriodDetailAPIView,
     AcademicPeriodListCreateAPIView,
+    AcademicPeriodPublishAPIView,
+    AcademicPeriodUnpublishAPIView,
     AcademicProgramDetailAPIView,
     AcademicProgramListCreateAPIView,
     CampusDetailAPIView,
@@ -65,6 +67,16 @@ urlpatterns = [
         "config/periods/<int:config_id>/",
         AcademicPeriodDetailAPIView.as_view(),
         name="config-periods-detail",
+    ),
+    path(
+        "config/periods/<int:config_id>/publish/",
+        AcademicPeriodPublishAPIView.as_view(),
+        name="config-periods-publish",
+    ),
+    path(
+        "config/periods/<int:config_id>/unpublish/",
+        AcademicPeriodUnpublishAPIView.as_view(),
+        name="config-periods-unpublish",
     ),
     path(
         "programming/periods/",

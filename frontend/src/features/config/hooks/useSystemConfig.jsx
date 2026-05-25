@@ -48,6 +48,8 @@ import {
   updateSpaceType,
   updateTimeSlot,
   updateWorkingDay,
+  publishPeriod,
+  unpublishPeriod,
 } from "../services/configApi";
 
 function buildCatalogResource(catalogType) {
@@ -891,6 +893,67 @@ export function useSystemConfig({ authToken, enabled, role }) {
     }
   };
 
+  const handlePublishPeriod = async (periodId) => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      const response = await publishPeriod(authToken, periodId, false);
+      if (response?.confirmation_required) {
+        const pendingText = (response.pending_offerings || [])
+          .map((item) => {
+            const subjectCode = item.asignatura?.code || "Asignatura";
+            const groupName = item.grupo?.name || "Sin grupo";
+            return `${subjectCode} | ${groupName} | ${item.razon}`;
+          })
+          .join("\n");
+        const confirmed = window.confirm(
+          `${response.warning}\n\n${pendingText || "No hay detalle adicional."}\n\n¿Deseas publicar de todas formas?`,
+        );
+        if (!confirmed) {
+          return;
+        }
+
+        await publishPeriod(authToken, periodId, true);
+      }
+
+      await refreshAll(role);
+    } catch (error) {
+      setState((previous) => ({
+        ...previous,
+        periods: {
+          ...previous.periods,
+          error: error.message || "No fue posible publicar el horario.",
+        },
+      }));
+    }
+  };
+
+  const handleUnpublishPeriod = async (periodId) => {
+    if (!authToken) {
+      return;
+    }
+
+    const confirmed = window.confirm("¿Deseas despublicar este horario para hacer correcciones?");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await unpublishPeriod(authToken, periodId);
+      await refreshAll(role);
+    } catch (error) {
+      setState((previous) => ({
+        ...previous,
+        periods: {
+          ...previous.periods,
+          error: error.message || "No fue posible despublicar el horario.",
+        },
+      }));
+    }
+  };
+
   const handleSubmit = async (resourceKey, event) => {
     event.preventDefault();
     if (!authToken) {
@@ -988,5 +1051,7 @@ export function useSystemConfig({ authToken, enabled, role }) {
     handleDelete,
     handleSubmit,
     resetResourceForm,
+    handlePublishPeriod,
+    handleUnpublishPeriod,
   };
 }

@@ -126,6 +126,8 @@ function App() {
     handleSelectEdit: handleConfigSelectEdit,
     handleDelete,
     handleSubmit,
+    handlePublishPeriod,
+    handleUnpublishPeriod,
     resetResourceForm,
   } = useSystemConfig({
     authToken,
@@ -258,6 +260,8 @@ function App() {
               onEdit={handleConfigSelectEdit}
               onDelete={handleDelete}
               onCancel={resetResourceForm}
+              onPublishPeriod={handlePublishPeriod}
+              onUnpublishPeriod={handleUnpublishPeriod}
               visibleSections={["subjectOfferings"]}
               title="Programacion academica"
               description="Gestiona solo la programacion de asignaturas para este rol."
@@ -274,6 +278,8 @@ function App() {
               onEdit={handleConfigSelectEdit}
               onDelete={handleDelete}
               onCancel={resetResourceForm}
+              onPublishPeriod={handlePublishPeriod}
+              onUnpublishPeriod={handleUnpublishPeriod}
               visibleSections={isAdmin ? undefined : ["periods", "workingDays", "timeSlots"]}
               title={isAdmin ? "Configuracion general del sistema" : "Configuracion limitada"}
               description={

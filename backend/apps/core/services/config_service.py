@@ -224,6 +224,23 @@ def update_academic_period(period, *, code, name, start_date, end_date, is_activ
 
 
 @transaction.atomic
+def publish_academic_period(period):
+    period.is_schedule_published = True
+    if period.schedule_published_at is None:
+        period.schedule_published_at = timezone.now()
+    period.save(update_fields=["is_schedule_published", "schedule_published_at", "updated_at"])
+    return period
+
+
+@transaction.atomic
+def unpublish_academic_period(period):
+    period.is_schedule_published = False
+    period.schedule_published_at = None
+    period.save(update_fields=["is_schedule_published", "schedule_published_at", "updated_at"])
+    return period
+
+
+@transaction.atomic
 def create_working_day(*, day_of_week, name, is_active=True):
     normalized_name = _normalize_required_text(
         name,

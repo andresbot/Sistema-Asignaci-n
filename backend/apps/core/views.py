@@ -60,6 +60,7 @@ from .services.master_data_import_service import (
     get_import_templates,
     import_master_data,
 )
+from .services.config_service import publish_academic_period, unpublish_academic_period
 from .services.user_service import deactivate_user_profile
 from .services.programming_service import get_active_academic_period
 
@@ -350,6 +351,68 @@ class AcademicPeriodListCreateAPIView(ConfigListCreateBaseAPIView):
 class AcademicPeriodDetailAPIView(ConfigDetailBaseAPIView):
     queryset = AcademicPeriod.objects.all()
     serializer_class = AcademicPeriodSerializer
+
+
+def _get_pending_subject_offerings_for_period(academic_period):
+    return SubjectOffering.objects.select_related(
+        "subject",
+        "subject_group",
+        "working_day",
+        "time_slot",
+        "academic_program",
+        "academic_period",
+    ).filter(
+        academic_period=academic_period,
+        is_active=True,
+        assigned_classroom__isnull=True,
+    ).order_by("subject__code", "subject_group__identifier", "semester", "id")
+
+
+class AcademicPeriodPublishAPIView(AdminProtectedAPIView):
+    def post(self, request, config_id):
+        academic_period = get_object_or_404(AcademicPeriod, id=config_id)
+        force_value = request.data.get("force", False)
+        force_publish = str(force_value).strip().lower() in ("true", "1", "yes", "on")
+
+        pending_queryset = _get_pending_subject_offerings_for_period(academic_period)
+        pending_items = HorarioUnassignedSerializer(pending_queryset, many=True).data
+
+        if pending_items and not force_publish:
+            return Response(
+                {
+                    "published": False,
+                    "confirmation_required": True,
+                    "warning": "Existen asignaturas sin salon asignado. Puede publicarse de todos modos si confirma.",
+                    "pending_offerings": pending_items,
+                    "academic_period": AcademicPeriodSerializer(academic_period).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        publish_academic_period(academic_period)
+        return Response(
+            {
+                "published": True,
+                "confirmation_required": False,
+                "warning": None,
+                "pending_offerings": pending_items,
+                "academic_period": AcademicPeriodSerializer(academic_period).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AcademicPeriodUnpublishAPIView(AdminProtectedAPIView):
+    def post(self, request, config_id):
+        academic_period = get_object_or_404(AcademicPeriod, id=config_id)
+        unpublish_academic_period(academic_period)
+        return Response(
+            {
+                "published": False,
+                "academic_period": AcademicPeriodSerializer(academic_period).data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class ScheduleAcademicPeriodListAPIView(APIView):

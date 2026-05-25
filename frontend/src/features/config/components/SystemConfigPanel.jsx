@@ -219,6 +219,8 @@ function ConfigSectionCard({
   onEdit,
   onDelete,
   onCancel,
+  onPublishPeriod,
+  onUnpublishPeriod,
 }) {
   return (
     <article className="card-block config-card">
@@ -342,6 +344,19 @@ function ConfigSectionCard({
               <p className="hint small">{buildItemSummary(sectionKey, item)}</p>
             </div>
             <div className="actions-inline compact">
+              {sectionKey === "periods" ? (
+                <button
+                  className={item.is_schedule_published ? "secondary" : "ghost"}
+                  type="button"
+                  onClick={() =>
+                    item.is_schedule_published
+                      ? onUnpublishPeriod(item.id)
+                      : onPublishPeriod(item.id)
+                  }
+                >
+                  {item.is_schedule_published ? "Despublicar" : "Publicar horario"}
+                </button>
+              ) : null}
               <button className="secondary" type="button" onClick={() => onEdit(sectionKey, item)}>
                 Editar
               </button>
@@ -465,6 +480,8 @@ export function SystemConfigPanel({
   onEdit,
   onDelete,
   onCancel,
+  onPublishPeriod,
+  onUnpublishPeriod,
   visibleSections,
   title = "Configuracion general del sistema",
   description,
@@ -505,6 +522,8 @@ export function SystemConfigPanel({
             onEdit={onEdit}
             onDelete={onDelete}
             onCancel={onCancel}
+            onPublishPeriod={onPublishPeriod}
+            onUnpublishPeriod={onUnpublishPeriod}
           />
         ))}
       </div>
