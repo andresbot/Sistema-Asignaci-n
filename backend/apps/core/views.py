@@ -633,6 +633,8 @@ class MyScheduleAPIView(APIView):
             "teacher__user_profile",
             "academic_program",
             "academic_period",
+            "assigned_classroom",
+            "assigned_classroom__campus",
         ).filter(academic_period=academic_period, is_active=True)
 
         if role_name == "docente":

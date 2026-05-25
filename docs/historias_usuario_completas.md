@@ -842,10 +842,10 @@ Escenario 2: Filtrar el horario por programa o semestre
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El coordinador tiene acceso de solo lectura al horario generado.
-- [ ] La vista incluye filtros por programa, semestre y sede.
-- [ ] La información mostrada coincide exactamente con el resultado del algoritmo y los ajustes manuales registrados.
-- [ ] Aprobada por el Product Owner.
+- [x] El coordinador tiene acceso de solo lectura al horario generado.
+- [x] La vista incluye filtros por programa, semestre y sede.
+- [x] La información mostrada coincide exactamente con el resultado del algoritmo y los ajustes manuales registrados.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -1029,9 +1029,9 @@ Escenario 1: Ver detalle completo de una clase
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] Cada entrada del horario muestra todos los campos requeridos.
-- [ ] La información de sede y salón coincide exactamente con la asignación del algoritmo o los ajustes manuales.
-- [ ] Aprobada por el Product Owner.
+- [x] Cada entrada del horario muestra todos los campos requeridos.
+- [x] La información de sede y salón coincide exactamente con la asignación del algoritmo o los ajustes manuales.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -1065,9 +1065,9 @@ Escenario 2: Grilla sin clases en una franja
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] La plantilla visual es la vista principal del horario para usuarios generales.
-- [ ] Es legible en pantallas de escritorio y tablet.
-- [ ] Aprobada por el Product Owner.
+- [x] La plantilla visual es la vista principal del horario para usuarios generales.
+- [x] Es legible en pantallas de escritorio y tablet.
+- [x] Aprobada por el Product Owner.
 
 ---
 

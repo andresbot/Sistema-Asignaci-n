@@ -3,16 +3,39 @@ function ScheduleCell({ asignaciones }) {
     return <td className="schedule-cell schedule-cell--empty" />;
   }
 
+  const formatTeacher = (docente) => {
+    if (!docente) {
+      return "Sin docente";
+    }
+
+    return `${docente.first_name || ""} ${docente.last_name || ""}`.trim() || "Sin docente";
+  };
+
+  const formatSpace = (espacio) => {
+    if (!espacio) {
+      return "Sin salón";
+    }
+
+    const campusName = espacio.sede?.name ? ` · ${espacio.sede.name}` : "";
+    return `${espacio.name || "Sin salón"}${campusName}`;
+  };
+
+  const formatGroup = (grupo) => {
+    if (!grupo) {
+      return "Sin grupo";
+    }
+
+    return grupo.name || "Sin grupo";
+  };
+
   return (
     <td className="schedule-cell">
       {asignaciones.map((a) => (
         <div key={a.id} className="schedule-chip">
-          <strong className="schedule-chip__subject">{a.asignatura.name}</strong>
+          <strong className="schedule-chip__subject">{a.asignatura?.name || "Sin asignatura"}</strong>
+          <span className="schedule-chip__meta">{formatTeacher(a.docente)}</span>
           <span className="schedule-chip__meta">
-            {a.docente.first_name} {a.docente.last_name}
-          </span>
-          <span className="schedule-chip__meta">
-            {a.grupo.name} &middot; {a.espacio.name}
+            {formatGroup(a.grupo)} &middot; {formatSpace(a.espacio)}
           </span>
         </div>
       ))}

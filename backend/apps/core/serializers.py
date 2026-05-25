@@ -436,6 +436,12 @@ class TeacherSummarySerializer(serializers.ModelSerializer):
 
 
 class SubjectOfferingSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source="subject.name", read_only=True)
+    day = serializers.CharField(source="working_day.name", read_only=True)
+    start_time = serializers.TimeField(source="time_slot.start_time", read_only=True)
+    end_time = serializers.TimeField(source="time_slot.end_time", read_only=True)
+    campus = serializers.CharField(source="assigned_classroom.campus.name", read_only=True)
+    classroom_code = serializers.CharField(source="assigned_classroom.code", read_only=True)
     subject = SubjectSerializer(read_only=True)
     subject_group = SubjectGroupSerializer(read_only=True)
     working_day = WorkingDaySerializer(read_only=True)
@@ -502,6 +508,13 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
             "updated_at",
+            # Campos agregados para la historia de usuario
+            "subject_name",
+            "day",
+            "start_time",
+            "end_time",
+            "campus",
+            "classroom_code",
         ]
 
     def validate_required_space_type_id(self, value):
