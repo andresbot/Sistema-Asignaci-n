@@ -207,7 +207,7 @@ describe('ScheduleConsultationPanel', () => {
 
       // Switch to unpublished period (ID 1)
       const select = screen.getByRole('combobox');
-      await userEvent.selectOption(select, '1');
+      await userEvent.setup().selectOptions(select, '1');
 
       await waitFor(() => {
         expect(
@@ -347,7 +347,7 @@ describe('ScheduleConsultationPanel', () => {
       const select = screen.getByRole('combobox');
 
       // Change selection to period 2
-      await userEvent.selectOption(select, '2');
+      await userEvent.setup().selectOptions(select, '2');
 
       await waitFor(() => {
         expect(scheduleApi.fetchMySchedule).toHaveBeenCalledWith(mockToken, 2);

@@ -42,6 +42,7 @@ from .serializers import (
     HorarioOfferingSerializer,
     HorarioUnassignedSerializer,
     LoginSerializer,
+    MyScheduleSerializer,
     RoleSerializer,
     SpaceTypeSerializer,
     SubjectGroupSerializer,
@@ -661,7 +662,7 @@ class MyScheduleAPIView(APIView):
         else:
             raise ValidationError({"detail": "Rol no habilitado para consultar horarios."})
 
-        serializer = SubjectOfferingSerializer(queryset.distinct(), many=True)
+        serializer = MyScheduleSerializer(queryset.distinct(), many=True)
         return Response(serializer.data)
 
 

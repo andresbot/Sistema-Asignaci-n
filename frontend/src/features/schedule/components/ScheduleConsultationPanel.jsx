@@ -6,15 +6,102 @@ function formatDateLabel(item) {
   return `${item.start_date} - ${item.end_date}`;
 }
 
-function buildScheduleKey(item) {
-  const day = item.working_day?.day_of_week ?? item.working_day?.name ?? "";
-  const slot = item.time_slot?.start_time ?? "";
-  return `${day}-${slot}-${item.id}`;
+function ScheduleChip({ item }) {
+  const teacherName = item.teacher
+    ? `${item.teacher.first_name} ${item.teacher.last_name}`.trim()
+    : "Sin docente";
+  const dayTime =
+    item.working_day && item.time_slot
+      ? `${item.working_day.name} · ${item.time_slot.start_time} - ${item.time_slot.end_time}`
+      : null;
+
+  return (
+    <article className="card-block schedule-item-card">
+      <div className="schedule-item-topline">
+        <strong>{item.subject?.code || "Asignatura"}</strong>
+        <span className="status-pill">S{item.semester}</span>
+      </div>
+      <h2>{item.subject?.name || "Sin nombre"}</h2>
+      <p className="hint">Grupo: {item.subject_group?.identifier || "Sin grupo"}</p>
+      {dayTime ? <p className="hint">{dayTime}</p> : null}
+      <p className="hint">Programa: {item.academic_program?.name || "Sin programa"}</p>
+      <p className="hint">Docente: {teacherName}</p>
+      {item.sede ? <p className="hint">Sede: {item.sede}</p> : null}
+      {item.salon ? <p className="hint">Salón: {item.salon}</p> : null}
+    </article>
+  );
+}
+
+function WeeklyGrid({ items }) {
+  const { days, slots, grid } = useMemo(() => {
+    const daysMap = new Map();
+    const slotsMap = new Map();
+    for (const item of items) {
+      const d = item.working_day;
+      const s = item.time_slot;
+      if (d?.id) daysMap.set(d.id, d);
+      if (s?.id) slotsMap.set(s.id, s);
+    }
+    const days = [...daysMap.values()].sort((a, b) => a.day_of_week - b.day_of_week);
+    const slots = [...slotsMap.values()].sort((a, b) =>
+      (a.start_time || "").localeCompare(b.start_time || ""),
+    );
+    const grid = new Map();
+    for (const item of items) {
+      if (!item.working_day?.id || !item.time_slot?.id) continue;
+      const key = `${item.time_slot.id}-${item.working_day.id}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(item);
+    }
+    return { days, slots, grid };
+  }, [items]);
+
+  return (
+    <div className="schedule-table-wrap">
+      <table className="schedule-table">
+        <thead>
+          <tr>
+            <th className="schedule-th-slot">Franja</th>
+            {days.map((d) => (
+              <th key={d.id} className="schedule-th-day">
+                {d.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((slot) => (
+            <tr key={slot.id}>
+              <td className="schedule-td-slot">
+                <strong>{slot.name || `${slot.start_time} – ${slot.end_time}`}</strong>
+                <span className="hint small" style={{ display: "block" }}>
+                  {slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}
+                </span>
+              </td>
+              {days.map((day) => {
+                const cell = grid.get(`${slot.id}-${day.id}`) || [];
+                if (cell.length === 0) {
+                  return <td key={day.id} className="schedule-cell schedule-cell--empty" />;
+                }
+                return (
+                  <td key={day.id} className="schedule-cell">
+                    {cell.map((item) => (
+                      <ScheduleChip key={item.id} item={item} />
+                    ))}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) {
   const [periods, setPeriods] = useState([]);
-  const [selectedPeriodId, setSelectedPeriodId] = useState("");
+  const [selectedPeriodId, setSelectedPeriodId] = useState(null);
   const [scheduleItems, setScheduleItems] = useState([]);
   const [loadingPeriods, setLoadingPeriods] = useState(false);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -34,15 +121,15 @@ export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) 
         }
 
         setPeriods(response);
-        // Select the most recent published period, or fallback to the most recent period
-        const publishedPeriods = response.filter((period) => period.is_schedule_published);
+        const publishedPeriods = response.filter((p) => p.is_schedule_published);
+        publishedPeriods.sort((a, b) => (b.start_date || "").localeCompare(a.start_date || ""));
         const defaultPeriod = publishedPeriods[0] || response[0];
         if (defaultPeriod) {
-          setSelectedPeriodId(String(defaultPeriod.id));
+          setSelectedPeriodId(defaultPeriod.id);
         }
-      } catch (requestError) {
+      } catch {
         if (mounted) {
-          setError(requestError.message || "No se pudieron cargar los periodos.");
+          setError("No se pudieron cargar los periodos.");
         }
       } finally {
         if (mounted) {
@@ -95,22 +182,9 @@ export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) 
   }, [authToken, selectedPeriodId]);
 
   const selectedPeriod = useMemo(
-    () => periods.find((period) => String(period.id) === String(selectedPeriodId)),
+    () => periods.find((p) => p.id === selectedPeriodId),
     [periods, selectedPeriodId],
   );
-
-  const sortedItems = useMemo(() => {
-    return [...scheduleItems].sort((left, right) => {
-      const dayDiff = Number(left.working_day?.day_of_week ?? 0) - Number(right.working_day?.day_of_week ?? 0);
-      if (dayDiff !== 0) {
-        return dayDiff;
-      }
-
-      const leftTime = left.time_slot?.start_time || "";
-      const rightTime = right.time_slot?.start_time || "";
-      return leftTime.localeCompare(rightTime);
-    });
-  }, [scheduleItems]);
 
   return (
     <main className="app-shell schedule-shell">
@@ -120,7 +194,8 @@ export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) 
             <p className="eyebrow">Consulta de horario</p>
             <h1>Horario por periodo academico</h1>
             <p className="lead compact">
-                Vista de solo lectura para {currentUser?.role || "usuario"}. Selecciona un periodo académico con horario publicado.
+              Vista de solo lectura para {currentUser?.role || "usuario"}. Selecciona un periodo
+              académico con horario publicado.
             </p>
           </div>
 
@@ -133,21 +208,26 @@ export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) 
           <label>
             Periodo academico
             <select
-              value={selectedPeriodId}
-              onChange={(event) => setSelectedPeriodId(event.target.value)}
+              value={selectedPeriodId ?? ""}
+              onChange={(e) => setSelectedPeriodId(Number(e.target.value) || null)}
               disabled={loadingPeriods || periods.length === 0}
             >
               <option value="">Selecciona un periodo</option>
               {periods.map((period) => (
                 <option key={period.id} value={period.id}>
-                  {period.code} | {formatDateLabel(period)} | {period.is_schedule_published ? "Publicado" : "Borrador"}
+                  {period.code} | {formatDateLabel(period)} |{" "}
+                  {period.is_schedule_published ? "Publicado" : "Borrador"}
                 </option>
               ))}
             </select>
           </label>
 
           <div className="schedule-status-stack">
-            <span className={selectedPeriod?.is_schedule_published ? "status-pill success" : "status-pill warning"}>
+            <span
+              className={
+                selectedPeriod?.is_schedule_published ? "status-pill success" : "status-pill warning"
+              }
+            >
               {selectedPeriod?.is_schedule_published ? "Publicado" : "Sin publicar"}
             </span>
             {selectedPeriod ? (
@@ -165,39 +245,20 @@ export function ScheduleConsultationPanel({ authToken, currentUser, onLogout }) 
           <article className="empty-state schedule-empty">
             <h2>Horario no disponible</h2>
             <p className="hint">
-              Este periodo aún no ha sido publicado. Cuando el administrador lo publique, podrás consultarlo aquí.
+              Este periodo aún no ha sido publicado. Cuando el administrador lo publique, podrás
+              consultarlo aquí.
             </p>
           </article>
         ) : null}
 
-        {!loadingSchedule && selectedPeriod?.is_schedule_published && sortedItems.length === 0 ? (
+        {!loadingSchedule && selectedPeriod?.is_schedule_published && scheduleItems.length === 0 ? (
           <article className="empty-state schedule-empty">
             <h2>No hay registros</h2>
             <p className="hint">No se encontraron asignaciones para el periodo seleccionado.</p>
           </article>
         ) : null}
 
-        {sortedItems.length > 0 ? (
-          <div className="schedule-grid">
-            {sortedItems.map((item) => (
-              <article key={buildScheduleKey(item)} className="card-block schedule-item-card">
-                <div className="schedule-item-topline">
-                  <strong>{item.subject?.code || "Asignatura"}</strong>
-                  <span className="status-pill">S{item.semester}</span>
-                </div>
-                <h2>{item.subject?.name || "Sin nombre"}</h2>
-                <p className="hint">Grupo: {item.subject_group?.identifier || "Sin grupo"}</p>
-                <p className="hint">
-                  {item.working_day?.name || "Sin dia"} · {item.time_slot ? `${item.time_slot.start_time} - ${item.time_slot.end_time}` : "Sin franja"}
-                </p>
-                <p className="hint">Programa: {item.academic_program?.name || "Sin programa"}</p>
-                <p className="hint">
-                  Docente: {item.teacher ? `${item.teacher.first_name} ${item.teacher.last_name}`.trim() : "Sin docente"}
-                </p>
-              </article>
-            ))}
-          </div>
-        ) : null}
+        {scheduleItems.length > 0 ? <WeeklyGrid items={scheduleItems} /> : null}
       </section>
     </main>
   );
