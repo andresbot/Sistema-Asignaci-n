@@ -445,6 +445,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
     academic_period = AcademicPeriodSerializer(read_only=True)
     edit_warning = serializers.SerializerMethodField(read_only=True)
     non_assignable_reason = serializers.SerializerMethodField(read_only=True)
+    requires_accessible_classroom = serializers.BooleanField(required=False)
     subject_id = serializers.PrimaryKeyRelatedField(
         source="subject", queryset=Subject.objects.all(), write_only=True
     )
@@ -491,6 +492,7 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "required_space_type_id",
             "teacher",
             "teacher_id",
+            "requires_accessible_classroom",
             "student_count",
             "non_assignable_reason",
             "academic_program_id",
@@ -521,6 +523,9 @@ class SubjectOfferingSerializer(serializers.ModelSerializer):
             "time_slot": validated_data.get("time_slot", instance.time_slot),
             "required_space_type": validated_data.get("required_space_type", instance.required_space_type),
             "teacher": validated_data.get("teacher", instance.teacher),
+            "requires_accessible_classroom": validated_data.get(
+                "requires_accessible_classroom", instance.requires_accessible_classroom
+            ),
             "student_count": validated_data.get("student_count", instance.student_count),
             "academic_program": validated_data.get("academic_program", instance.academic_program),
             "academic_period": validated_data.get("academic_period", instance.academic_period),
@@ -730,3 +735,71 @@ class ClassroomSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("La capacidad debe ser mayor a cero.")
         return value
+
+
+class HorarioOfferingSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para la grilla de horario del administrador."""
+
+    working_day = WorkingDaySerializer(read_only=True)
+    time_slot = TimeSlotSerializer(read_only=True)
+    asignatura = serializers.SerializerMethodField()
+    docente = serializers.SerializerMethodField()
+    grupo = serializers.SerializerMethodField()
+    espacio = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectOffering
+        fields = ["id", "working_day", "time_slot", "asignatura", "docente", "grupo", "espacio"]
+
+    def get_asignatura(self, obj):
+        return {"id": obj.subject.id, "code": obj.subject.code, "name": obj.subject.name}
+
+    def get_docente(self, obj):
+        if not obj.teacher:
+            return None
+        return {
+            "id": obj.teacher.id,
+            "first_name": obj.teacher.first_name,
+            "last_name": obj.teacher.last_name,
+        }
+
+    def get_grupo(self, obj):
+        if not obj.subject_group:
+            return None
+        return {"id": obj.subject_group.id, "name": obj.subject_group.identifier}
+
+    def get_espacio(self, obj):
+        if not obj.assigned_classroom:
+            return None
+        campus = obj.assigned_classroom.campus
+        return {
+            "id": obj.assigned_classroom.id,
+            "name": obj.assigned_classroom.name,
+            "sede": {"id": campus.id, "name": campus.name} if campus else None,
+        }
+
+
+class HorarioUnassignedSerializer(serializers.ModelSerializer):
+    """Serializer para asignaturas que el algoritmo no pudo programar."""
+
+    asignatura = serializers.SerializerMethodField()
+    grupo = serializers.SerializerMethodField()
+    razon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectOffering
+        fields = ["id", "asignatura", "grupo", "razon"]
+
+    def get_asignatura(self, obj):
+        return {"id": obj.subject.id, "code": obj.subject.code, "name": obj.subject.name}
+
+    def get_grupo(self, obj):
+        if not obj.subject_group:
+            return {"id": None, "name": "Sin grupo"}
+        return {"id": obj.subject_group.id, "name": obj.subject_group.identifier}
+
+    def get_razon(self, obj):
+        if obj.schedule_failure_reason:
+            return obj.schedule_failure_reason
+        from .services.programming_service import get_offering_non_assignable_reason
+        return get_offering_non_assignable_reason(obj) or "Razon no especificada."

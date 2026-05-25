@@ -552,6 +552,184 @@ tbody td:last-child {
   font-size: 0.96rem;
 }
 
+/* ── Schedule View ───────────────────────────────────────────── */
+
+.schedule-view {
+  display: grid;
+  gap: 20px;
+}
+
+.schedule-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.schedule-filters label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.92rem;
+  min-width: 200px;
+}
+
+.schedule-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.86rem;
+  min-width: 700px;
+}
+
+.schedule-table thead th {
+  background: var(--surface-high);
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--on-surface-muted);
+  border-bottom: 2px solid color-mix(in srgb, var(--outline-variant) 30%, transparent);
+  white-space: nowrap;
+}
+
+.schedule-th-slot {
+  min-width: 110px;
+  text-align: left;
+  border-radius: var(--radius-md) 0 0 0;
+}
+
+.schedule-th-day {
+  min-width: 150px;
+  text-align: center;
+}
+
+.schedule-th-day:last-child {
+  border-radius: 0 var(--radius-md) 0 0;
+}
+
+.schedule-td-slot {
+  background: var(--surface-high);
+  padding: 10px 12px;
+  vertical-align: top;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--on-surface-muted);
+  border-right: 2px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+}
+
+.schedule-cell {
+  padding: 6px;
+  vertical-align: top;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 16%, transparent);
+  min-height: 64px;
+}
+
+.schedule-cell--empty {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.schedule-table tbody tr:nth-child(odd) .schedule-cell:not(.schedule-cell--empty) {
+  background: var(--surface-lowest);
+}
+
+.schedule-table tbody tr:nth-child(even) .schedule-cell:not(.schedule-cell--empty) {
+  background: var(--surface-low);
+}
+
+.schedule-chip {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-lowest));
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  display: grid;
+  gap: 2px;
+}
+
+.schedule-chip:last-child {
+  margin-bottom: 0;
+}
+
+.schedule-chip__subject {
+  font-size: 0.84rem;
+  color: var(--on-surface);
+  line-height: 1.3;
+}
+
+.schedule-chip__meta {
+  font-size: 0.76rem;
+  color: var(--on-surface-muted);
+}
+
+/* ── Unassigned section ─────────────────────────────────────── */
+
+.unassigned-section {
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface-lowest));
+  border-left: 4px solid color-mix(in srgb, var(--primary) 50%, transparent);
+}
+
+.unassigned-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: color-mix(in srgb, var(--primary) 80%, var(--on-surface));
+}
+
+.unassigned-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.unassigned-item {
+  background: var(--surface-lowest);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.unassigned-item__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.unassigned-item__reason {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--on-surface-muted);
+}
+
+.hint.small {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .schedule-filters {
+    flex-direction: column;
+  }
+
+  .schedule-filters label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .schedule-chip__subject {
+    font-size: 0.8rem;
+  }
+
+  .schedule-chip__meta {
+    font-size: 0.72rem;
+  }
+}
+
 @media (max-width: 640px) {
   .hero-card {
     padding: 24px;

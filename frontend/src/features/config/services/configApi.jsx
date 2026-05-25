@@ -30,6 +30,21 @@ export function deletePeriod(token, id) {
   });
 }
 
+export function publishPeriod(token, id, force = false) {
+  return coreApiRequest(`/config/periods/${id}/publish/`, {
+    method: "POST",
+    token,
+    body: { force },
+  });
+}
+
+export function unpublishPeriod(token, id) {
+  return coreApiRequest(`/config/periods/${id}/unpublish/`, {
+    method: "POST",
+    token,
+  });
+}
+
 export function listWorkingDays(token) {
   return coreApiRequest("/config/working-days/", { token });
 }

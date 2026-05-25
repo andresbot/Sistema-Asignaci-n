@@ -15,15 +15,17 @@ def get_offering_non_assignable_reason(offering):
     Used by the scheduling algorithm to report non-assignable offerings (HU-8 Scenario 2).
     """
     student_count = offering.student_count
-    if not student_count:
+    requires_accessible_classroom = getattr(offering, "requires_accessible_classroom", False)
+    if not student_count and not requires_accessible_classroom:
         return None
 
-    if offering.required_space_type is not None:
+    if offering.required_space_type is not None or requires_accessible_classroom:
         available, reason = check_classrooms_available_for_space_type(
             offering.required_space_type,
             working_day=None,
             time_slot=None,
             student_count=student_count,
+            requires_accessible_classroom=requires_accessible_classroom,
         )
         return reason if not available else None
 
@@ -44,24 +46,41 @@ def _validate_space_type_compatibility(subject, required_space_type):
         )
 
 
-def check_classrooms_available_for_space_type(required_space_type, working_day, time_slot, student_count=None):
+def check_classrooms_available_for_space_type(
+    required_space_type,
+    working_day,
+    time_slot,
+    student_count=None,
+    requires_accessible_classroom=False,
+):
     """Return (available: bool, reason: str).
 
     Used by the scheduling algorithm to validate Escenario 2 of HU21:
     if the required space type has no classrooms available in the given slot,
     the offering is reported as non-assignable.
     """
-    if required_space_type is None:
+    if (
+        required_space_type is None
+        and not requires_accessible_classroom
+        and (student_count is None or student_count <= 0)
+    ):
         return True, ""
 
-    classrooms_of_type = Classroom.objects.filter(
-        space_type=required_space_type,
-        is_active=True,
-    )
+    classrooms_of_type = Classroom.objects.filter(is_active=True)
+    if required_space_type is not None:
+        classrooms_of_type = classrooms_of_type.filter(space_type=required_space_type)
     if student_count is not None and student_count > 0:
         classrooms_of_type = classrooms_of_type.filter(capacity__gte=student_count)
+    if requires_accessible_classroom:
+        classrooms_of_type = classrooms_of_type.filter(is_accessible=True)
 
     if not classrooms_of_type.exists():
+        if requires_accessible_classroom and required_space_type is not None and student_count is not None and student_count > 0:
+            return False, f"sin salones accesibles del tipo requerido con capacidad para {student_count} estudiantes"
+        if requires_accessible_classroom and required_space_type is not None:
+            return False, "sin salones accesibles del tipo requerido disponibles"
+        if requires_accessible_classroom:
+            return False, "sin salones accesibles disponibles"
         if student_count is not None and student_count > 0:
             return False, f"sin salones del tipo requerido con capacidad para {student_count} estudiantes"
         return False, "sin salones del tipo requerido disponibles"
@@ -105,6 +124,7 @@ def create_subject_offering(
     required_space_type=None,
     teacher=None,
     student_count=None,
+    requires_accessible_classroom=False,
     academic_program,
     academic_period=None,
     semester,
@@ -127,6 +147,7 @@ def create_subject_offering(
             required_space_type=required_space_type,
             teacher=teacher,
             student_count=student_count,
+            requires_accessible_classroom=requires_accessible_classroom,
             academic_program=academic_program,
             academic_period=academic_period,
             semester=semester,
@@ -147,6 +168,7 @@ def update_subject_offering(
     required_space_type=None,
     teacher=None,
     student_count=None,
+    requires_accessible_classroom=False,
     academic_program,
     academic_period,
     semester,
@@ -162,6 +184,7 @@ def update_subject_offering(
     subject_offering.required_space_type = required_space_type
     subject_offering.teacher = teacher
     subject_offering.student_count = student_count
+    subject_offering.requires_accessible_classroom = requires_accessible_classroom
     subject_offering.academic_program = academic_program
     subject_offering.academic_period = academic_period
     subject_offering.semester = semester

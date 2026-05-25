@@ -9,12 +9,14 @@ import { ImportManagementPanel } from "./features/config/components/ImportManage
 import { SystemConfigPanel } from "./features/config/components/SystemConfigPanel";
 import { useSystemConfig } from "./features/config/hooks/useSystemConfig";
 import { ScheduleConsultationPanel } from "./features/schedule/components/ScheduleConsultationPanel";
+import { ScheduleView } from "./features/schedule/components/ScheduleView";
 import { UsersDashboard } from "./features/users/components/UsersDashboard";
 import { useUsersManagement } from "./features/users/hooks/useUsersManagement";
 import { coreApiBase } from "./shared/api/coreApiClient";
 
 const ADMIN_SECTIONS = [
   { key: "inicio", label: "Inicio" },
+  { key: "horario", label: "Horario" },
   { key: "usuarios", label: "Usuarios" },
   { key: "configuracion", label: "Configuracion" },
   { key: "importacion", label: "Importacion" },
@@ -124,6 +126,8 @@ function App() {
     handleSelectEdit: handleConfigSelectEdit,
     handleDelete,
     handleSubmit,
+    handlePublishPeriod,
+    handleUnpublishPeriod,
     resetResourceForm,
   } = useSystemConfig({
     authToken,
@@ -220,6 +224,13 @@ function App() {
             />
           ) : null}
 
+          {activeSectionItem?.key === "horario" ? (
+            <ScheduleView
+              authToken={authToken}
+              periodos={configState.periods?.items ?? []}
+            />
+          ) : null}
+
           {activeSectionItem?.key === "usuarios" ? (
             <UsersDashboard
               currentUser={currentUser}
@@ -249,6 +260,8 @@ function App() {
               onEdit={handleConfigSelectEdit}
               onDelete={handleDelete}
               onCancel={resetResourceForm}
+              onPublishPeriod={handlePublishPeriod}
+              onUnpublishPeriod={handleUnpublishPeriod}
               visibleSections={["subjectOfferings"]}
               title="Programacion academica"
               description="Gestiona solo la programacion de asignaturas para este rol."
@@ -265,6 +278,8 @@ function App() {
               onEdit={handleConfigSelectEdit}
               onDelete={handleDelete}
               onCancel={resetResourceForm}
+              onPublishPeriod={handlePublishPeriod}
+              onUnpublishPeriod={handleUnpublishPeriod}
               visibleSections={isAdmin ? undefined : ["periods", "workingDays", "timeSlots"]}
               title={isAdmin ? "Configuracion general del sistema" : "Configuracion limitada"}
               description={

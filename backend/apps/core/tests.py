@@ -44,6 +44,7 @@ from .services.config_service import (
 from .services.programming_service import (
     check_classrooms_available_for_space_type,
     create_subject_offering,
+    get_offering_non_assignable_reason,
 )
 from .services.user_service import (
     UserEmailAlreadyExistsError,
@@ -370,6 +371,7 @@ class ProgrammingTests(BaseAuthTestCase):
                 "working_day_id": self.working_day.id,
                 "time_slot_id": self.time_slot.id,
                 "semester": 4,
+                "requires_accessible_classroom": True,
             },
             format="json",
         )
@@ -377,6 +379,52 @@ class ProgrammingTests(BaseAuthTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["academic_period"]["id"], self.active_period.id)
         self.assertEqual(response.data["semester"], 4)
+        self.assertTrue(response.data["requires_accessible_classroom"])
+
+    def test_accessible_classroom_requirement_is_respected(self):
+        accessible_space_type = CatalogItem.objects.create(
+            catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE,
+            name="Aula Accesible HU20",
+        )
+        accessible_classroom = Classroom.objects.create(
+            code="ACC-01",
+            name="Salon Accesible 1",
+            campus=self.campus,
+            space_type=accessible_space_type,
+            capacity=45,
+            is_accessible=True,
+            is_active=True,
+        )
+        Classroom.objects.create(
+            code="NOACC-01",
+            name="Salon No Accesible 1",
+            campus=self.campus,
+            space_type=accessible_space_type,
+            capacity=60,
+            is_accessible=False,
+            is_active=True,
+        )
+
+        offering = create_subject_offering(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            semester=5,
+            student_count=30,
+            requires_accessible_classroom=True,
+        )
+
+        self.assertIsNone(get_offering_non_assignable_reason(offering))
+
+        accessible_classroom.delete()
+        offering.refresh_from_db()
+
+        reason = get_offering_non_assignable_reason(offering)
+        self.assertIsNotNone(reason)
+        self.assertIn("accesible", reason.lower())
 
     def test_subject_offering_rejects_inactive_working_day(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")
@@ -1054,6 +1102,31 @@ class UserServiceTests(TestCase):
                 role=self.coordinator_role,
             )
 
+    def test_create_user_reuses_orphan_auth_user_with_same_username(self):
+        from django.contrib.auth.models import User
+
+        orphan_user = User.objects.create_user(
+            username="orphan@test.com",
+            email="",
+            password="oldpassword123",
+        )
+
+        profile = create_user_with_profile(
+            email="orphan@test.com",
+            password="serviciopassword123",
+            first_name="Orphan",
+            last_name="User",
+            role=self.coordinator_role,
+        )
+
+        orphan_user.refresh_from_db()
+        profile.refresh_from_db()
+
+        self.assertEqual(profile.user_id, orphan_user.id)
+        self.assertEqual(profile.email, "orphan@test.com")
+        self.assertEqual(orphan_user.email, "orphan@test.com")
+        self.assertTrue(orphan_user.check_password("serviciopassword123"))
+
     def test_update_user_profile(self):
         profile = create_user_with_profile(
             email="update@test.com",
@@ -1090,7 +1163,30 @@ class UserServiceTests(TestCase):
         profile.user.refresh_from_db()
 
         self.assertFalse(profile.is_active)
-        self.assertFalse(profile.user.is_active)
+
+    def test_create_docente_creates_teacher(self):
+        from apps.core.models import CatalogItem, Teacher
+
+        docente_role, _ = Role.objects.get_or_create(name="Docente")
+        # Ensure a teacher link type exists
+        CatalogItem.objects.create(
+            catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE,
+            name="Vinculacion",
+            is_active=True,
+        )
+
+        profile = create_user_with_profile(
+            email="profe_new@test.com",
+            password="serviciopassword123",
+            first_name="Profe",
+            last_name="Nuevo",
+            role=docente_role,
+        )
+
+        self.assertTrue(Teacher.objects.filter(user_profile=profile).exists())
+        teacher = Teacher.objects.get(user_profile=profile)
+        self.assertEqual(teacher.email, "profe_new@test.com")
+        self.assertTrue(profile.user.is_active)
 
 
 class SystemConfigApiTests(BaseAuthTestCase):
@@ -1139,6 +1235,81 @@ class SystemConfigApiTests(BaseAuthTestCase):
             reverse("config-periods-detail", kwargs={"config_id": period_id})
         )
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_admin_can_publish_and_unpublish_academic_period(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        campus = Campus.objects.create(code="PUB-CAM", name="Campus Publicacion")
+        program = AcademicProgram.objects.create(code="PUB-PRG", name="Programa Publicacion", campus=campus)
+        period = AcademicPeriod.objects.create(
+            code="2026-PUB",
+            name="Periodo Publicacion",
+            start_date=date(2026, 1, 15),
+            end_date=date(2026, 6, 15),
+            is_active=True,
+            is_schedule_published=False,
+        )
+        subject = Subject.objects.create(
+            code="PUB101",
+            name="Asignatura Publicacion",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        subject_group = SubjectGroup.objects.create(subject=subject, identifier="G1")
+        working_day = WorkingDay.objects.create(day_of_week=2, name="Martes PUB", is_active=True)
+        time_slot = TimeSlot.objects.create(
+            name="08:00-10:00 PUB",
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            is_active=True,
+        )
+        create_subject_offering(
+            subject=subject,
+            subject_group=subject_group,
+            working_day=working_day,
+            time_slot=time_slot,
+            academic_program=program,
+            academic_period=period,
+            semester=1,
+            student_count=25,
+        )
+
+        publish_response = self.client.post(
+            reverse("config-periods-publish", kwargs={"config_id": period.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(publish_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(publish_response.data["confirmation_required"])
+        self.assertFalse(publish_response.data["published"])
+        self.assertEqual(len(publish_response.data["pending_offerings"]), 1)
+
+        force_publish_response = self.client.post(
+            reverse("config-periods-publish", kwargs={"config_id": period.id}),
+            {"force": True},
+            format="json",
+        )
+        self.assertEqual(force_publish_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(force_publish_response.data["published"])
+
+        period.refresh_from_db()
+        self.assertTrue(period.is_schedule_published)
+        self.assertIsNotNone(period.schedule_published_at)
+
+        unpublish_response = self.client.post(
+            reverse("config-periods-unpublish", kwargs={"config_id": period.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(unpublish_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(unpublish_response.data["published"])
+
+        period.refresh_from_db()
+        self.assertFalse(period.is_schedule_published)
+        self.assertIsNone(period.schedule_published_at)
 
     def test_invalid_period_range_is_rejected(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")

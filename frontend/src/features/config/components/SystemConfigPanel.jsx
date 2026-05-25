@@ -113,6 +113,12 @@ const SECTION_DEFINITIONS = {
         optionsFrom: "teachers",
       },
       { name: "student_count", label: "Cupo matriculado", type: "number", required: false, min: 0 },
+      {
+        name: "requires_accessible_classroom",
+        label: "Estudiantes con discapacidad",
+        type: "checkbox",
+        required: false,
+      },
       { name: "semester", label: "Semestre", type: "number", required: true, min: 1 },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
@@ -213,6 +219,8 @@ function ConfigSectionCard({
   onEdit,
   onDelete,
   onCancel,
+  onPublishPeriod,
+  onUnpublishPeriod,
 }) {
   return (
     <article className="card-block config-card">
@@ -336,6 +344,19 @@ function ConfigSectionCard({
               <p className="hint small">{buildItemSummary(sectionKey, item)}</p>
             </div>
             <div className="actions-inline compact">
+              {sectionKey === "periods" ? (
+                <button
+                  className={item.is_schedule_published ? "secondary" : "ghost"}
+                  type="button"
+                  onClick={() =>
+                    item.is_schedule_published
+                      ? onUnpublishPeriod(item.id)
+                      : onPublishPeriod(item.id)
+                  }
+                >
+                  {item.is_schedule_published ? "Despublicar" : "Publicar horario"}
+                </button>
+              ) : null}
               <button className="secondary" type="button" onClick={() => onEdit(sectionKey, item)}>
                 Editar
               </button>
@@ -382,9 +403,10 @@ function buildItemSummary(sectionKey, item) {
     const teacher = item.teacher
       ? `${item.teacher.first_name} ${item.teacher.last_name}`.trim()
       : "Sin docente";
+    const accessibility = item.requires_accessible_classroom ? "Requiere accesibilidad" : "Sin restriccion de accesibilidad";
 
     const cupo = item.student_count !== null && item.student_count !== undefined ? `Cupo ${item.student_count}` : "Sin cupo";
-    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | S${item.semester} | ${spaceType} | ${teacher} | ${cupo}`;
+    return `${programCode} | ${subjectCode} | ${groupIdentifier} | ${workingDay} | ${timeSlot} | S${item.semester} | ${spaceType} | ${teacher} | ${cupo} | ${accessibility}`;
   }
 
   if (sectionKey === "periods") {
@@ -458,6 +480,8 @@ export function SystemConfigPanel({
   onEdit,
   onDelete,
   onCancel,
+  onPublishPeriod,
+  onUnpublishPeriod,
   visibleSections,
   title = "Configuracion general del sistema",
   description,
@@ -498,6 +522,8 @@ export function SystemConfigPanel({
             onEdit={onEdit}
             onDelete={onDelete}
             onCancel={onCancel}
+            onPublishPeriod={onPublishPeriod}
+            onUnpublishPeriod={onUnpublishPeriod}
           />
         ))}
       </div>

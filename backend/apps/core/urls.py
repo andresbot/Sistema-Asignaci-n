@@ -5,6 +5,8 @@ from .views import (
     AdminOnlyAPIView,
     AcademicPeriodDetailAPIView,
     AcademicPeriodListCreateAPIView,
+    AcademicPeriodPublishAPIView,
+    AcademicPeriodUnpublishAPIView,
     AcademicProgramDetailAPIView,
     AcademicProgramListCreateAPIView,
     CampusDetailAPIView,
@@ -17,6 +19,8 @@ from .views import (
     CourseGroupDetailAPIView,
     CourseGroupListCreateAPIView,
     CourseListCreateAPIView,
+    HorarioAPIView,
+    HorarioNoAsignadasAPIView,
     LoginAPIView,
     LogoutAPIView,
     MasterDataImportAPIView,
@@ -63,6 +67,16 @@ urlpatterns = [
         "config/periods/<int:config_id>/",
         AcademicPeriodDetailAPIView.as_view(),
         name="config-periods-detail",
+    ),
+    path(
+        "config/periods/<int:config_id>/publish/",
+        AcademicPeriodPublishAPIView.as_view(),
+        name="config-periods-publish",
+    ),
+    path(
+        "config/periods/<int:config_id>/unpublish/",
+        AcademicPeriodUnpublishAPIView.as_view(),
+        name="config-periods-unpublish",
     ),
     path(
         "programming/periods/",
@@ -186,4 +200,6 @@ urlpatterns = [
         StudentEnrollmentListCreateAPIView.as_view(),
         name="programming-student-enrollments",
     ),
+    path("horario/", HorarioAPIView.as_view(), name="horario"),
+    path("horario/no-asignadas/", HorarioNoAsignadasAPIView.as_view(), name="horario-no-asignadas"),
 ]
