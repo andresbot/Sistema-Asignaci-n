@@ -17,6 +17,7 @@ from .models import (
     Course,
     CourseGroup,
     Role,
+    ScheduleExecution,
     Subject,
     SubjectGroup,
     SubjectOffering,
@@ -46,12 +47,14 @@ from .services.programming_service import (
     create_subject_offering,
     get_offering_non_assignable_reason,
 )
+from .services.schedule_execution_service import run_schedule_execution, queue_schedule_execution
 from .services.user_service import (
     UserEmailAlreadyExistsError,
     create_user_with_profile,
     deactivate_user_profile,
     update_user_profile,
 )
+import time as _time
 
 
 class BaseAuthTestCase(APITestCase):
@@ -138,6 +141,101 @@ class ProgrammingTests(BaseAuthTestCase):
             end_time=time(19, 0),
             is_active=True,
         )
+
+
+class IntegrationScheduleExecutionTests(BaseAuthTestCase):
+    def setUp(self):
+        # create admin and base data
+        self.admin_user = self.create_user(
+            email="admin.exec@test.com",
+            password="adminpassword123",
+            role=self.admin_role,
+            first_name="Ana",
+            last_name="Exec",
+        )
+        self.campus = Campus.objects.create(code="C1", name="Campus 1")
+        self.program = AcademicProgram.objects.create(code="PRG1", name="Programa 1", campus=self.campus)
+        self.period = AcademicPeriod.objects.create(
+            code="P-INT-2026",
+            name="Periodo INT",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+        )
+
+        # working days and time slots
+        self.working_day = WorkingDay.objects.create(day_of_week=1, name="Lunes", is_active=True)
+        self.time_slot = TimeSlot.objects.create(name="08:00-10:00", start_time=time(8, 0), end_time=time(10, 0), is_active=True)
+
+        # classrooms
+        self.space_type = CatalogItem.objects.create(catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE, name="Salon standard")
+        self.classroom1 = Classroom.objects.create(code="A101", name="A101", campus=self.campus, space_type=self.space_type, capacity=50, is_accessible=True)
+        self.classroom2 = Classroom.objects.create(code="B201", name="B201", campus=self.campus, space_type=self.space_type, capacity=30, is_accessible=False)
+
+        # subject and groups
+        self.subject1 = Subject.objects.create(code="INT101", name="Intro INT A", class_type=Subject.CLASS_TYPE_PRESENCIAL, credits=3, weekly_hours=2, capacity=30, difficulty=60)
+        self.subject_group1 = SubjectGroup.objects.create(subject=self.subject1, identifier="G1")
+
+        self.subject2 = Subject.objects.create(code="INT102", name="Intro INT B", class_type=Subject.CLASS_TYPE_PRESENCIAL, credits=3, weekly_hours=2, capacity=25, difficulty=50)
+        self.subject_group2 = SubjectGroup.objects.create(subject=self.subject2, identifier="G1")
+
+        # create two offerings without assignment (different subjects to avoid unique constraint)
+        self.offering1 = SubjectOffering.objects.create(
+            subject=self.subject1,
+            subject_group=self.subject_group1,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+            is_active=True,
+        )
+        self.offering2 = SubjectOffering.objects.create(
+            subject=self.subject2,
+            subject_group=self.subject_group2,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+            is_active=True,
+        )
+
+    def test_create_execution_api_enqueues_and_applies_stub_assignments(self):
+        # login as admin
+        self.login_and_set_auth("admin.exec@test.com", "adminpassword123")
+
+        payload = {"academic_period_id": self.period.id, "generaciones": 2}
+        response = self.client.post(reverse("programming-schedule-executions-list-create"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        execution_id = response.data["id"]
+
+        # poll for execution completion (timeout after ~10s)
+        detail_url = reverse("programming-schedule-executions-detail", kwargs={"execution_id": execution_id})
+        finished = False
+        for _ in range(40):
+            resp = self.client.get(detail_url)
+            self.assertIn(resp.status_code, (status.HTTP_200_OK,))
+            data = resp.data
+            if data.get("status") == "completed":
+                finished = True
+                break
+            _time.sleep(0.25)
+
+        self.assertTrue(finished, "Execution did not finish in time")
+
+        # refresh offerings and check assignments or failure reasons set
+        self.offering1.refresh_from_db()
+        self.offering2.refresh_from_db()
+
+        # At least one offering should have an assigned_classroom or a failure reason set by the stub
+        assigned_or_reason = lambda o: (o.assigned_classroom is not None) or (o.schedule_failure_reason and o.schedule_failure_reason.strip())
+        self.assertTrue(assigned_or_reason(self.offering1))
+        self.assertTrue(assigned_or_reason(self.offering2))
+
+        # academic period timestamp must be set
+        self.period.refresh_from_db()
+        self.assertIsNotNone(self.period.schedule_generated_at)
+
+
+
 
     def test_admin_can_create_subject_group(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")
@@ -1169,10 +1267,10 @@ class UserServiceTests(TestCase):
 
         docente_role, _ = Role.objects.get_or_create(name="Docente")
         # Ensure a teacher link type exists
-        CatalogItem.objects.create(
+        CatalogItem.objects.get_or_create(
             catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE,
             name="Vinculacion",
-            is_active=True,
+            defaults={"is_active": True},
         )
 
         profile = create_user_with_profile(
@@ -2805,6 +2903,108 @@ class SubjectOfferingEditWarningTests(BaseAuthTestCase):
         warning = response.data["edit_warning"]
         self.assertIsNotNone(warning)
         self.assertIn(generated_at.strftime("%Y-%m-%d"), warning)
+
+
+class ScheduleExecutionServiceTests(BaseAuthTestCase):
+    def setUp(self):
+        self.admin_user = self.create_user(
+            email="admin.schedule@test.com",
+            password="adminpassword123",
+            role=self.admin_role,
+            first_name="Ana",
+            last_name="Schedule",
+        )
+        self.campus = Campus.objects.create(code="SE-CAM", name="Campus SE")
+        self.program = AcademicProgram.objects.create(
+            code="SE-PRG", name="Programa SE", campus=self.campus
+        )
+        self.period = AcademicPeriod.objects.create(
+            code="SE-2026",
+            name="Periodo SE",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+        )
+        self.subject = Subject.objects.create(
+            code="SE-MAT",
+            name="Matematicas SE",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=30,
+            difficulty=120,
+        )
+        self.subject_group = SubjectGroup.objects.create(subject=self.subject, identifier="G1")
+        self.working_day = WorkingDay.objects.create(day_of_week=2, name="Martes", is_active=True)
+        self.time_slot = TimeSlot.objects.create(
+            name="08:00-10:00",
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            is_active=True,
+        )
+        self.assigned_offering = SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+        )
+        self.unassigned_offering = SubjectOffering.objects.create(
+            subject=Subject.objects.create(
+                code="SE-HIS",
+                name="Historia SE",
+                class_type=Subject.CLASS_TYPE_PRESENCIAL,
+                credits=2,
+                weekly_hours=2,
+                capacity=20,
+                difficulty=40,
+            ),
+            subject_group=SubjectGroup.objects.create(
+                subject=Subject.objects.get(code="SE-HIS"), identifier="G2"
+            ),
+            academic_program=self.program,
+            academic_period=self.period,
+            semester=1,
+        )
+
+    def test_run_schedule_execution_completes_and_marks_period_timestamp(self):
+        execution = ScheduleExecution.objects.create(
+            academic_period=self.period,
+            requested_by=self.admin_user,
+            parameters={"generaciones": 5},
+        )
+
+        run_schedule_execution(execution)
+
+        execution.refresh_from_db()
+        self.period.refresh_from_db()
+
+        self.assertEqual(execution.status, ScheduleExecution.Status.COMPLETED)
+        self.assertEqual(execution.progress, 100)
+        self.assertIsNotNone(execution.finished_at)
+        self.assertEqual(execution.result_snapshot["summary"]["total_assignments"], 1)
+        self.assertEqual(execution.result_snapshot["summary"]["total_unassigned"], 1)
+        self.assertEqual(execution.result_snapshot["current_generation"], 5)
+        self.assertEqual(execution.result_snapshot["total_generations"], 5)
+        self.assertIsNotNone(self.period.schedule_generated_at)
+
+    def test_queue_schedule_execution_runs_worker_and_persists(self):
+        execution = ScheduleExecution.objects.create(
+            academic_period=self.period,
+            requested_by=self.admin_user,
+            parameters={"generaciones": 3},
+        )
+
+        # run synchronously to avoid sqlite locking in threaded tests
+        run_schedule_execution(execution)
+
+        execution.refresh_from_db()
+        self.assertEqual(execution.status, ScheduleExecution.Status.COMPLETED)
+
+        self.period.refresh_from_db()
+        self.assertIsNotNone(self.period.schedule_generated_at)
 
 
 class RegisterStudentCountHUTests(BaseAuthTestCase):

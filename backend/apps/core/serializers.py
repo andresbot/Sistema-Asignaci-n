@@ -11,6 +11,7 @@ from .models import (
     Course,
     CourseGroup,
     Role,
+    ScheduleExecution,
     SpaceType,
     Subject,
     SubjectGroup,
@@ -872,3 +873,50 @@ class MyScheduleSerializer(serializers.ModelSerializer):
         if not obj.assigned_classroom:
             return None
         return obj.assigned_classroom.name
+
+
+class ScheduleExecutionSerializer(serializers.ModelSerializer):
+    academic_period = AcademicPeriodSerializer(read_only=True)
+    requested_by_username = serializers.CharField(source="requested_by.username", read_only=True)
+
+    class Meta:
+        model = ScheduleExecution
+        fields = [
+            "id",
+            "academic_period",
+            "requested_by_username",
+            "status",
+            "progress",
+            "parameters",
+            "result_snapshot",
+            "error_message",
+            "started_at",
+            "finished_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "status",
+            "progress",
+            "result_snapshot",
+            "error_message",
+            "started_at",
+            "finished_at",
+            "created_at",
+            "updated_at",
+            "requested_by_username",
+        ]
+
+
+class ScheduleExecutionCreateSerializer(serializers.Serializer):
+    academic_period_id = serializers.PrimaryKeyRelatedField(
+        source="academic_period",
+        queryset=AcademicPeriod.objects.all(),
+    )
+    poblacion_size = serializers.IntegerField(min_value=1, required=False, default=20)
+    generaciones = serializers.IntegerField(min_value=1, required=False, default=200)
+    proporcion_heuristica = serializers.FloatField(min_value=0, max_value=1, required=False, default=0.2)
+    estancamiento_max = serializers.IntegerField(min_value=0, required=False, default=10)
+
+    def validate(self, attrs):
+        return attrs

@@ -1,5 +1,7 @@
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -19,6 +21,7 @@ from .models import (
     Course,
     CourseGroup,
     Role,
+    ScheduleExecution,
     SpaceType,
     Subject,
     SubjectGroup,
@@ -44,6 +47,8 @@ from .serializers import (
     LoginSerializer,
     MyScheduleSerializer,
     RoleSerializer,
+    ScheduleExecutionCreateSerializer,
+    ScheduleExecutionSerializer,
     SpaceTypeSerializer,
     SubjectGroupSerializer,
     SubjectOfferingSerializer,
@@ -62,6 +67,7 @@ from .services.master_data_import_service import (
     import_master_data,
 )
 from .services.config_service import publish_academic_period, unpublish_academic_period
+from .services.schedule_execution_service import queue_schedule_execution
 from .services.user_service import deactivate_user_profile
 from .services.programming_service import get_active_academic_period
 
@@ -893,3 +899,57 @@ class HorarioNoAsignadasAPIView(AdminProtectedAPIView):
 
         serializer = HorarioUnassignedSerializer(queryset, many=True)
         return Response({"unassigned": serializer.data})
+
+
+class ScheduleExecutionListCreateAPIView(AdminProtectedAPIView):
+    def get(self, request):
+        queryset = ScheduleExecution.objects.select_related("academic_period", "requested_by")
+        period_id = request.query_params.get("period_id")
+        status_value = request.query_params.get("status")
+
+        if period_id:
+            queryset = queryset.filter(academic_period_id=period_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+
+        serializer = ScheduleExecutionSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = ScheduleExecutionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        academic_period = validated_data["academic_period"]
+
+        if not academic_period.is_active:
+            raise ValidationError({"academic_period_id": "El periodo academico debe estar activo."})
+
+        execution = ScheduleExecution.objects.create(
+            academic_period=academic_period,
+            requested_by=request.user,
+            status=ScheduleExecution.Status.PENDING,
+            progress=0,
+            parameters={
+                "poblacion_size": validated_data["poblacion_size"],
+                "generaciones": validated_data["generaciones"],
+                "proporcion_heuristica": validated_data["proporcion_heuristica"],
+                "estancamiento_max": validated_data["estancamiento_max"],
+            },
+        )
+
+        transaction.on_commit(lambda: queue_schedule_execution(execution.id))
+
+        response_serializer = ScheduleExecutionSerializer(execution)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ScheduleExecutionDetailAPIView(AdminProtectedAPIView):
+    def get_object(self, execution_id):
+        return get_object_or_404(
+            ScheduleExecution.objects.select_related("academic_period", "requested_by"),
+            id=execution_id,
+        )
+
+    def get(self, _request, execution_id):
+        execution = self.get_object(execution_id)
+        return Response(ScheduleExecutionSerializer(execution).data)

@@ -10,6 +10,26 @@ export function fetchMySchedule(token, academicPeriodId) {
   });
 }
 
+export function listScheduleExecutions(token, { periodId, status } = {}) {
+  const params = new URLSearchParams();
+  if (periodId) params.set("period_id", periodId);
+  if (status) params.set("status", status);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return coreApiRequest(`/programming/schedule-executions/${query}`, { token });
+}
+
+export function createScheduleExecution(token, payload) {
+  return coreApiRequest("/programming/schedule-executions/", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function fetchScheduleExecution(token, id) {
+  return coreApiRequest(`/programming/schedule-executions/${id}/`, { token });
+}
+
 export async function fetchCampuses(token) {
   return coreApiRequest("/master-data/campuses/", { token });
 }

@@ -60,6 +60,39 @@ class AcademicPeriod(TimeStampedModel):
         return f"{self.code} - {self.name}"
 
 
+# HU10 execution record used by the scheduling flow.
+class ScheduleExecution(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        RUNNING = "running", "En ejecucion"
+        COMPLETED = "completed", "Completado"
+        FAILED = "failed", "Fallido"
+
+    academic_period = models.ForeignKey(
+        AcademicPeriod,
+        on_delete=models.PROTECT,
+        related_name="schedule_executions",
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="schedule_executions",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    progress = models.PositiveSmallIntegerField(default=0)
+    parameters = models.JSONField(default=dict, blank=True)
+    result_snapshot = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.academic_period.code} - {self.get_status_display()}"
+
+
 class Subject(TimeStampedModel):
     CLASS_TYPE_PRESENCIAL = "presencial"
     CLASS_TYPE_VIRTUAL = "virtual"
