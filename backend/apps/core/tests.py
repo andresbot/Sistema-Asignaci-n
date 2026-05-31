@@ -47,6 +47,7 @@ from .services.programming_service import (
     create_subject_offering,
     get_offering_non_assignable_reason,
 )
+from .services.schedule_validation_service import validate_schedule_before_execution
 from .services.schedule_execution_service import run_schedule_execution, queue_schedule_execution
 from .services.user_service import (
     UserEmailAlreadyExistsError,
@@ -857,6 +858,145 @@ class AuthenticationTests(BaseAuthTestCase):
         self.assertIn("refresh", response.data)
         self.assertEqual(response.data["user"]["email"], "admin@test.com")
         self.assertEqual(response.data["user"]["role"], "administrador")
+
+
+class ScheduleValidationServiceTests(ProgrammingTests):
+    def _create_teacher(self, email, first_name, last_name):
+        link_type, _ = CatalogItem.objects.get_or_create(
+            catalog_type=CatalogItem.CatalogType.TEACHER_LINK_TYPE,
+            name="Contrato validacion HU9",
+        )
+        teacher_user = self.create_user(
+            email=email,
+            password="teachpass123",
+            role=self.docente_role,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        return Teacher.objects.create(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            link_type=link_type,
+            hourly_rate=10.0,
+            user_profile=teacher_user.profile,
+        )
+
+    def test_validate_schedule_before_execution_returns_success_when_all_data_is_valid(self):
+        teacher = self._create_teacher("teacher-valid@test.com", "Val", "Teacher")
+        space_type = CatalogItem.objects.create(
+            catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE,
+            name="Salon valido HU9",
+        )
+        Classroom.objects.create(
+            code="HU9-101",
+            name="Salon HU9 101",
+            campus=self.campus,
+            space_type=space_type,
+            capacity=40,
+            is_accessible=True,
+            is_active=True,
+        )
+
+        SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            teacher=teacher,
+            required_space_type=space_type,
+            student_count=30,
+            semester=1,
+            is_active=True,
+        )
+
+        result = validate_schedule_before_execution(self.active_period)
+
+        self.assertTrue(result["can_run_algorithm"])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["summary"]["issues_count"], 0)
+        self.assertEqual(result["issues"], [])
+
+    def test_validate_schedule_before_execution_detects_blocking_issues_and_teacher_conflict(self):
+        teacher = self._create_teacher("teacher-conflict@test.com", "Conf", "Teacher")
+        space_type = CatalogItem.objects.create(
+            catalog_type=CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE,
+            name="Salon conflicto HU9",
+        )
+        Classroom.objects.create(
+            code="HU9-201",
+            name="Salon HU9 201",
+            campus=self.campus,
+            space_type=space_type,
+            capacity=50,
+            is_accessible=True,
+            is_active=True,
+        )
+
+        other_subject = Subject.objects.create(
+            code="MAT102",
+            name="Calculo II",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=40,
+            difficulty=160,
+        )
+        other_group = SubjectGroup.objects.create(subject=other_subject, identifier="Grupo 2")
+
+        SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            working_day=None,
+            time_slot=None,
+            teacher=None,
+            required_space_type=None,
+            student_count=None,
+            semester=1,
+            is_active=True,
+        )
+
+        SubjectOffering.objects.create(
+            subject=other_subject,
+            subject_group=other_group,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            teacher=teacher,
+            required_space_type=None,
+            student_count=25,
+            semester=2,
+            is_active=True,
+        )
+
+        SubjectOffering.objects.create(
+            subject=self.subject,
+            subject_group=self.subject_group,
+            academic_program=self.academic_program,
+            academic_period=self.active_period,
+            working_day=self.working_day,
+            time_slot=self.time_slot,
+            teacher=teacher,
+            required_space_type=space_type,
+            student_count=30,
+            semester=3,
+            is_active=True,
+        )
+
+        result = validate_schedule_before_execution(self.active_period)
+
+        self.assertFalse(result["can_run_algorithm"])
+        codes = {issue["code"] for issue in result["issues"]}
+        self.assertIn("missing_slot", codes)
+        self.assertIn("missing_teacher", codes)
+        self.assertIn("missing_capacity", codes)
+        self.assertIn("missing_space_type", codes)
+        self.assertIn("teacher_conflict", codes)
 
     def test_login_rejects_invalid_credentials(self):
         response = self.client.post(

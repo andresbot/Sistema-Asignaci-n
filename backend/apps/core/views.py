@@ -67,6 +67,7 @@ from .services.master_data_import_service import (
     import_master_data,
 )
 from .services.config_service import publish_academic_period, unpublish_academic_period
+from .services.schedule_validation_service import validate_schedule_before_execution
 from .services.schedule_execution_service import queue_schedule_execution
 from .services.user_service import deactivate_user_profile
 from .services.programming_service import get_active_academic_period
@@ -953,3 +954,13 @@ class ScheduleExecutionDetailAPIView(AdminProtectedAPIView):
     def get(self, _request, execution_id):
         execution = self.get_object(execution_id)
         return Response(ScheduleExecutionSerializer(execution).data)
+
+
+class ScheduleValidationAPIView(AdminProtectedAPIView):
+    def get(self, request):
+        period_id = request.query_params.get("period_id")
+        if not period_id:
+            raise ValidationError({"period_id": "Debes seleccionar un periodo academico."})
+
+        academic_period = get_object_or_404(AcademicPeriod, id=period_id)
+        return Response(validate_schedule_before_execution(academic_period))

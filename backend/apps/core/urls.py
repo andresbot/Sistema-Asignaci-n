@@ -37,6 +37,7 @@ from .views import (
     ScheduleAcademicPeriodListAPIView,
     ScheduleExecutionDetailAPIView,
     ScheduleExecutionListCreateAPIView,
+    ScheduleValidationAPIView,
     MyScheduleAPIView,
     StudentEnrollmentListCreateAPIView,
     TeacherDetailAPIView,
@@ -89,6 +90,11 @@ urlpatterns = [
         "programming/schedule-executions/",
         ScheduleExecutionListCreateAPIView.as_view(),
         name="programming-schedule-executions-list-create",
+    ),
+    path(
+        "programming/schedule-validation/",
+        ScheduleValidationAPIView.as_view(),
+        name="programming-schedule-validation",
     ),
     path(
         "programming/schedule-executions/<int:execution_id>/",

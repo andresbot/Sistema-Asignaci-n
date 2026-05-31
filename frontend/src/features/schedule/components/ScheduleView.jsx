@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createScheduleExecution,
   fetchScheduleExecution,
+  fetchScheduleValidation,
   listScheduleExecutions,
 } from "../services/scheduleApi";
 import { useSchedule } from "../hooks/useSchedule";
@@ -39,6 +40,9 @@ export function ScheduleView({ authToken, periodos, canRunExecution = false }) {
   const [executionLoading, setExecutionLoading] = useState(false);
   const [executionError, setExecutionError] = useState("");
   const [executionNotice, setExecutionNotice] = useState("");
+  const [validationResult, setValidationResult] = useState(null);
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [validationError, setValidationError] = useState("");
 
   const refreshExecutions = async () => {
     if (!canRunExecution || !authToken || !periodoId) {
@@ -56,6 +60,13 @@ export function ScheduleView({ authToken, periodos, canRunExecution = false }) {
   useEffect(() => {
     refreshExecutions();
   }, [authToken, canRunExecution, periodoId]);
+
+  useEffect(() => {
+    setValidationResult(null);
+    setValidationError("");
+    setExecutionError("");
+    setExecutionNotice("");
+  }, [periodoId]);
 
   useEffect(() => {
     const lastExecution = executions[0];
@@ -82,6 +93,32 @@ export function ScheduleView({ authToken, periodos, canRunExecution = false }) {
   }, [authToken, canRunExecution, periodoId, executions]);
 
   const latestExecution = useMemo(() => executions[0] || null, [executions]);
+
+  const handleValidationSubmit = async () => {
+    if (!authToken || !periodoId) {
+      return;
+    }
+
+    setValidationLoading(true);
+    setValidationError("");
+
+    try {
+      const response = await fetchScheduleValidation(authToken, periodoId);
+      setValidationResult(response);
+      if (response.can_run_algorithm) {
+        setExecutionNotice("La validacion no encontro inconsistencias criticas.");
+        setExecutionError("");
+      } else {
+        setExecutionNotice("");
+        setExecutionError("La programacion tiene inconsistencias y no puede ejecutarse todavia.");
+      }
+    } catch (requestError) {
+      setValidationResult(null);
+      setValidationError(requestError.message || "No se pudo validar la programacion.");
+    } finally {
+      setValidationLoading(false);
+    }
+  };
 
   const handleExecutionSubmit = async (event) => {
     event.preventDefault();
@@ -188,6 +225,60 @@ export function ScheduleView({ authToken, periodos, canRunExecution = false }) {
             </div>
           </header>
 
+            <div className="card-block" style={{ marginBottom: 16 }}>
+              <div className="dashboard-header" style={{ marginBottom: 12 }}>
+                <div>
+                  <p className="eyebrow">Validacion previa</p>
+                  <h2>Revisar inconsistencias antes de ejecutar</h2>
+                  <p className="hint compact">
+                    Verifica cupo, docente, franja horaria y conflictos antes de lanzar el algoritmo.
+                  </p>
+                </div>
+                <button type="button" className="secondary" onClick={handleValidationSubmit} disabled={validationLoading || !periodoId}>
+                  {validationLoading ? "Validando..." : "Validar programacion"}
+                </button>
+              </div>
+
+              {!periodoId ? <p className="hint">Selecciona un periodo academico para validar.</p> : null}
+              {validationError ? <p className="error-text">{validationError}</p> : null}
+
+              {validationResult ? (
+                <div>
+                  <p className={validationResult.can_run_algorithm ? "hint" : "error-text"}>
+                    {validationResult.message}
+                  </p>
+                  <div className="stack-grid workspace-metrics" style={{ marginTop: 12 }}>
+                    <article>
+                      <span>Estados</span>
+                      <strong>{validationResult.status}</strong>
+                    </article>
+                    <article>
+                      <span>Problemas</span>
+                      <strong>{validationResult.summary?.issues_count || 0}</strong>
+                    </article>
+                    <article>
+                      <span>Franja / docente</span>
+                      <strong>{(validationResult.summary?.missing_slot || 0) + (validationResult.summary?.missing_teacher || 0)}</strong>
+                    </article>
+                    <article>
+                      <span>Capacidad / espacio</span>
+                      <strong>{(validationResult.summary?.missing_capacity || 0) + (validationResult.summary?.missing_space_type || 0) + (validationResult.summary?.non_assignable_capacity || 0)}</strong>
+                    </article>
+                  </div>
+
+                  {validationResult.issues?.length ? (
+                    <ul className="hint" style={{ marginTop: 12, marginBottom: 0, paddingLeft: 18 }}>
+                      {validationResult.issues.map((issue, index) => (
+                        <li key={`${issue.code}-${index}`}>
+                          <strong>{issue.title}:</strong> {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
           <form className="schedule-filters" onSubmit={handleExecutionSubmit}>
             <label>
               Tamano poblacion
@@ -252,11 +343,17 @@ export function ScheduleView({ authToken, periodos, canRunExecution = false }) {
             </label>
 
             <div style={{ alignSelf: "end" }}>
-              <button type="submit" disabled={executionLoading || !periodoId}>
+              <button type="submit" disabled={executionLoading || !periodoId || !validationResult?.can_run_algorithm}>
                 {executionLoading ? "Creando solicitud..." : "Ejecutar algoritmo"}
               </button>
             </div>
           </form>
+
+          {!validationResult?.can_run_algorithm ? (
+            <p className="hint" style={{ marginTop: 8 }}>
+              Debes validar la programacion y corregir las inconsistencias antes de ejecutar.
+            </p>
+          ) : null}
 
           {executionError ? <p className="error-text">{executionError}</p> : null}
           {executionNotice ? <p className="hint">{executionNotice}</p> : null}

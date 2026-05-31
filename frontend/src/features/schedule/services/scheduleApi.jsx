@@ -30,6 +30,13 @@ export function fetchScheduleExecution(token, id) {
   return coreApiRequest(`/programming/schedule-executions/${id}/`, { token });
 }
 
+export function fetchScheduleValidation(token, periodId) {
+  const params = new URLSearchParams();
+  if (periodId) params.set("period_id", periodId);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return coreApiRequest(`/programming/schedule-validation/${query}`, { token });
+}
+
 export async function fetchCampuses(token) {
   return coreApiRequest("/master-data/campuses/", { token });
 }
