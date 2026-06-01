@@ -228,6 +228,7 @@ function App() {
             <ScheduleView
               authToken={authToken}
               periodos={configState.periods?.items ?? []}
+              canRunExecution={isAdmin}
             />
           ) : null}
 

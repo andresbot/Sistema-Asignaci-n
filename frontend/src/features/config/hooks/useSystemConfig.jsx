@@ -54,7 +54,7 @@ import {
 
 function buildCatalogResource(catalogType) {
   return {
-    list: (token) => listCatalogItemsByType(token, catalogType),
+    list: (token) => listCatalogItemsByType(token, catalogType, true),
     create: (token, payload) => createCatalogItemByType(token, catalogType, payload),
     update: (token, id, payload) =>
       updateCatalogItemByType(token, catalogType, id, payload),
@@ -304,6 +304,10 @@ function validateForm(resourceKey, resourceState) {
     if (form.start_time >= form.end_time) {
       return "La hora de fin debe ser mayor a la hora de inicio.";
     }
+  }
+
+  if (resourceKey === "subjectOfferings") {
+    return "";
   }
 
   if (
@@ -686,9 +690,13 @@ export function useSystemConfig({ authToken, enabled, role }) {
 
     try {
       const items = await resourceApi.list(authToken);
+      const visibleItems =
+        resourceKey === "periods"
+          ? items.filter((item) => item.is_active !== false)
+          : items;
       setResourceState(resourceKey, (resourceState) => ({
         ...resourceState,
-        items,
+        items: visibleItems,
         loading: false,
       }));
     } catch (error) {
@@ -835,6 +843,8 @@ export function useSystemConfig({ authToken, enabled, role }) {
           subject_id: value,
           subject_group_id: "",
         },
+        error: "",
+        fieldErrors: {},
       }));
       return;
     }
@@ -845,6 +855,8 @@ export function useSystemConfig({ authToken, enabled, role }) {
         ...resourceState.form,
         [field]: value,
       },
+      error: "",
+      fieldErrors: {},
     }));
   };
 

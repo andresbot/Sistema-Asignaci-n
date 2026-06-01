@@ -11,6 +11,7 @@ from .models import (
     Course,
     CourseGroup,
     Role,
+    ScheduleExecution,
     SpaceType,
     Subject,
     SubjectGroup,
@@ -158,10 +159,15 @@ class SubjectSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(self._map_subject_error(exc)) from exc
 
     def update(self, instance, validated_data):
+        class_type_item = validated_data.get("class_type_item", instance.class_type_item)
         payload = {
             "code": validated_data.get("code", instance.code),
             "name": validated_data.get("name", instance.name),
-            "class_type": validated_data.get("class_type", instance.class_type),
+            "class_type": validated_data.get(
+                "class_type",
+                None if "class_type_item" in validated_data else instance.class_type,
+            ),
+            "class_type_item": class_type_item,
             "credits": validated_data.get("credits", instance.credits),
             "weekly_hours": validated_data.get("weekly_hours", instance.weekly_hours),
             "capacity": validated_data.get("capacity", instance.capacity),
@@ -816,3 +822,106 @@ class HorarioUnassignedSerializer(serializers.ModelSerializer):
             return obj.schedule_failure_reason
         from .services.programming_service import get_offering_non_assignable_reason
         return get_offering_non_assignable_reason(obj) or "Razon no especificada."
+
+
+class MyScheduleSerializer(serializers.ModelSerializer):
+    """Serializer para la vista de horario personal de docentes y estudiantes."""
+
+    working_day = WorkingDaySerializer(read_only=True)
+    time_slot = TimeSlotSerializer(read_only=True)
+    subject = serializers.SerializerMethodField()
+    subject_group = serializers.SerializerMethodField()
+    academic_program = serializers.SerializerMethodField()
+    teacher = serializers.SerializerMethodField()
+    sede = serializers.SerializerMethodField()
+    salon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectOffering
+        fields = [
+            "id", "subject", "subject_group", "working_day", "time_slot",
+            "academic_program", "teacher", "semester", "sede", "salon",
+        ]
+
+    def get_subject(self, obj):
+        return {"id": obj.subject.id, "code": obj.subject.code, "name": obj.subject.name}
+
+    def get_subject_group(self, obj):
+        if not obj.subject_group:
+            return None
+        return {"id": obj.subject_group.id, "identifier": obj.subject_group.identifier}
+
+    def get_academic_program(self, obj):
+        if not obj.academic_program:
+            return None
+        return {
+            "id": obj.academic_program.id,
+            "code": obj.academic_program.code,
+            "name": obj.academic_program.name,
+        }
+
+    def get_teacher(self, obj):
+        if not obj.teacher:
+            return None
+        return {
+            "id": obj.teacher.id,
+            "first_name": obj.teacher.first_name,
+            "last_name": obj.teacher.last_name,
+        }
+
+    def get_sede(self, obj):
+        if not obj.assigned_classroom or not obj.assigned_classroom.campus:
+            return None
+        return obj.assigned_classroom.campus.name
+
+    def get_salon(self, obj):
+        if not obj.assigned_classroom:
+            return None
+        return obj.assigned_classroom.name
+
+
+class ScheduleExecutionSerializer(serializers.ModelSerializer):
+    academic_period = AcademicPeriodSerializer(read_only=True)
+    requested_by_username = serializers.CharField(source="requested_by.username", read_only=True)
+
+    class Meta:
+        model = ScheduleExecution
+        fields = [
+            "id",
+            "academic_period",
+            "requested_by_username",
+            "status",
+            "progress",
+            "parameters",
+            "result_snapshot",
+            "error_message",
+            "started_at",
+            "finished_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "status",
+            "progress",
+            "result_snapshot",
+            "error_message",
+            "started_at",
+            "finished_at",
+            "created_at",
+            "updated_at",
+            "requested_by_username",
+        ]
+
+
+class ScheduleExecutionCreateSerializer(serializers.Serializer):
+    academic_period_id = serializers.PrimaryKeyRelatedField(
+        source="academic_period",
+        queryset=AcademicPeriod.objects.all(),
+    )
+    poblacion_size = serializers.IntegerField(min_value=1, required=False, default=20)
+    generaciones = serializers.IntegerField(min_value=1, required=False, default=200)
+    proporcion_heuristica = serializers.FloatField(min_value=0, max_value=1, required=False, default=0.2)
+    estancamiento_max = serializers.IntegerField(min_value=0, required=False, default=10)
+
+    def validate(self, attrs):
+        return attrs

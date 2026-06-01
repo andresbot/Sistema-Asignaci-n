@@ -65,8 +65,16 @@ def _validate_catalog_type(catalog_type):
         raise ConfigValidationError("El tipo de catalogo no es valido.", field="catalog_type")
 
 
+def _catalog_type_label(catalog_type):
+    return {
+        CatalogItem.CatalogType.TEACHER_LINK_TYPE: "tipo de vinculacion docente",
+        CatalogItem.CatalogType.CLASS_TYPE: "tipo de clase",
+        CatalogItem.CatalogType.ACADEMIC_SPACE_TYPE: "tipo de espacio academico",
+    }.get(catalog_type, "tipo de catalogo")
+
+
 def _ensure_period_code_unique(code, *, exclude_id=None):
-    queryset = AcademicPeriod.objects.filter(code__iexact=code)
+    queryset = AcademicPeriod.objects.filter(code__iexact=code, is_active=True)
     if exclude_id is not None:
         queryset = queryset.exclude(id=exclude_id)
     if queryset.exists():
@@ -82,7 +90,11 @@ def _ensure_space_type_name_unique(name, *, exclude_id=None):
 
 
 def _ensure_catalog_item_name_unique(catalog_type, name, *, exclude_id=None):
-    queryset = CatalogItem.objects.filter(catalog_type=catalog_type, name__iexact=name)
+    queryset = CatalogItem.objects.filter(
+        catalog_type=catalog_type,
+        name__iexact=name,
+        is_active=True,
+    )
     if exclude_id is not None:
         queryset = queryset.exclude(id=exclude_id)
     if queryset.exists():
@@ -374,7 +386,8 @@ def create_catalog_item(*, catalog_type, name, description="", is_active=True):
         field="name",
         empty_message="El nombre del catalogo es obligatorio.",
     )
-    _ensure_catalog_item_name_unique(catalog_type, normalized_name)
+    if is_active:
+        _ensure_catalog_item_name_unique(catalog_type, normalized_name)
 
     try:
         return CatalogItem.objects.create(
@@ -385,7 +398,8 @@ def create_catalog_item(*, catalog_type, name, description="", is_active=True):
         )
     except IntegrityError as exc:
         raise ConfigValidationError(
-            "Ya existe un valor para este tipo de catalogo con ese nombre.", field="name"
+            f"Ya existe un {_catalog_type_label(catalog_type)} con ese nombre.",
+            field="name",
         ) from exc
 
 
@@ -396,11 +410,12 @@ def update_catalog_item(catalog_item, *, name, description, is_active):
         field="name",
         empty_message="El nombre del catalogo es obligatorio.",
     )
-    _ensure_catalog_item_name_unique(
-        catalog_item.catalog_type,
-        normalized_name,
-        exclude_id=catalog_item.id,
-    )
+    if is_active:
+        _ensure_catalog_item_name_unique(
+            catalog_item.catalog_type,
+            normalized_name,
+            exclude_id=catalog_item.id,
+        )
 
     catalog_item.name = normalized_name
     catalog_item.description = (description or "").strip()
@@ -410,7 +425,8 @@ def update_catalog_item(catalog_item, *, name, description, is_active):
         catalog_item.save()
     except IntegrityError as exc:
         raise ConfigValidationError(
-            "Ya existe un valor para este tipo de catalogo con ese nombre.", field="name"
+            f"Ya existe un {_catalog_type_label(catalog_item.catalog_type)} con ese nombre.",
+            field="name",
         ) from exc
 
     return catalog_item
