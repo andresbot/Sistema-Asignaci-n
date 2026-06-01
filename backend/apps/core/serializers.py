@@ -159,10 +159,15 @@ class SubjectSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(self._map_subject_error(exc)) from exc
 
     def update(self, instance, validated_data):
+        class_type_item = validated_data.get("class_type_item", instance.class_type_item)
         payload = {
             "code": validated_data.get("code", instance.code),
             "name": validated_data.get("name", instance.name),
-            "class_type": validated_data.get("class_type", instance.class_type),
+            "class_type": validated_data.get(
+                "class_type",
+                None if "class_type_item" in validated_data else instance.class_type,
+            ),
+            "class_type_item": class_type_item,
             "credits": validated_data.get("credits", instance.credits),
             "weekly_hours": validated_data.get("weekly_hours", instance.weekly_hours),
             "capacity": validated_data.get("capacity", instance.capacity),

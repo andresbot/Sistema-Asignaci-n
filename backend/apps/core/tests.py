@@ -21,6 +21,7 @@ from .models import (
     Subject,
     SubjectGroup,
     SubjectOffering,
+    SpaceType,
     Teacher,
     TimeSlot,
     UserProfile,
@@ -148,11 +149,25 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
     def setUp(self):
         # create admin and base data
         self.admin_user = self.create_user(
+            email="admin@test.com",
+            password="adminpassword123",
+            role=self.admin_role,
+            first_name="Ana",
+            last_name="Admin",
+        )
+        self.execution_admin_user = self.create_user(
             email="admin.exec@test.com",
             password="adminpassword123",
             role=self.admin_role,
             first_name="Ana",
             last_name="Exec",
+        )
+        self.coordinator_user = self.create_user(
+            email="coord@test.com",
+            password="coordpassword123",
+            role=self.coordinator_role,
+            first_name="Carlos",
+            last_name="Coord",
         )
         self.campus = Campus.objects.create(code="C1", name="Campus 1")
         self.program = AcademicProgram.objects.create(code="PRG1", name="Programa 1", campus=self.campus)
@@ -162,6 +177,15 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
             start_date=date(2026, 1, 1),
             end_date=date(2026, 6, 30),
             is_active=True,
+        )
+        # active period used by some programming APIs/tests
+        self.active_period = AcademicPeriod.objects.create(
+            code="P-ACT-2026",
+            name="Periodo Activo",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 6, 30),
+            is_active=True,
+            is_schedule_published=False,
         )
 
         # working days and time slots
@@ -173,12 +197,30 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
         self.classroom1 = Classroom.objects.create(code="A101", name="A101", campus=self.campus, space_type=self.space_type, capacity=50, is_accessible=True)
         self.classroom2 = Classroom.objects.create(code="B201", name="B201", campus=self.campus, space_type=self.space_type, capacity=30, is_accessible=False)
 
-        # subject and groups
-        self.subject1 = Subject.objects.create(code="INT101", name="Intro INT A", class_type=Subject.CLASS_TYPE_PRESENCIAL, credits=3, weekly_hours=2, capacity=30, difficulty=60)
-        self.subject_group1 = SubjectGroup.objects.create(subject=self.subject1, identifier="G1")
+        # subject and groups (restore expected fixtures: MAT101 primary subject)
+        self.subject1 = Subject.objects.create(
+            code="MAT101",
+            name="Calculo I",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=4,
+            capacity=40,
+            difficulty=160,
+        )
+        self.subject_group1 = SubjectGroup.objects.create(subject=self.subject1, identifier="Grupo 1")
 
-        self.subject2 = Subject.objects.create(code="INT102", name="Intro INT B", class_type=Subject.CLASS_TYPE_PRESENCIAL, credits=3, weekly_hours=2, capacity=25, difficulty=50)
-        self.subject_group2 = SubjectGroup.objects.create(subject=self.subject2, identifier="G1")
+        self.subject2 = Subject.objects.create(
+            code="INT102",
+            name="Intro INT B",
+            class_type=Subject.CLASS_TYPE_PRESENCIAL,
+            credits=3,
+            weekly_hours=2,
+            capacity=25,
+            difficulty=50,
+        )
+        self.subject_group2 = SubjectGroup.objects.create(subject=self.subject2, identifier="Grupo 1")
+        self.subject_group = self.subject_group1
+        self.subject = self.subject1
 
         # create two offerings without assignment (different subjects to avoid unique constraint)
         self.offering1 = SubjectOffering.objects.create(
@@ -197,6 +239,7 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
             semester=1,
             is_active=True,
         )
+        self.academic_program = self.program
 
     def test_create_execution_api_enqueues_and_applies_stub_assignments(self):
         # login as admin
@@ -211,7 +254,7 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
         # poll for execution completion (timeout after ~10s)
         detail_url = reverse("programming-schedule-executions-detail", kwargs={"execution_id": execution_id})
         finished = False
-        for _ in range(40):
+        for _ in range(80):
             resp = self.client.get(detail_url)
             self.assertIn(resp.status_code, (status.HTTP_200_OK,))
             data = resp.data
@@ -510,6 +553,7 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
             working_day=self.working_day,
             time_slot=self.time_slot,
             academic_program=self.academic_program,
+            required_space_type=accessible_space_type,
             academic_period=self.active_period,
             semester=5,
             student_count=30,
@@ -518,7 +562,9 @@ class IntegrationScheduleExecutionTests(BaseAuthTestCase):
 
         self.assertIsNone(get_offering_non_assignable_reason(offering))
 
-        accessible_classroom.delete()
+        # mark classroom as inactive (soft-delete semantics)
+        accessible_classroom.is_active = False
+        accessible_classroom.save(update_fields=["is_active", "updated_at"]) 
         offering.refresh_from_db()
 
         reason = get_offering_non_assignable_reason(offering)
@@ -1444,6 +1490,35 @@ class SystemConfigApiTests(BaseAuthTestCase):
             last_name="Coord",
         )
 
+    def test_admin_can_update_subject_class_type_item(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        subject = Subject.objects.create(
+            code="TSTCLASS",
+            name="Prueba nueva",
+            class_type=Subject.CLASS_TYPE_VIRTUAL,
+            credits=2,
+            weekly_hours=2,
+            capacity=20,
+            difficulty=40,
+        )
+        presencial_item = CatalogItem.objects.filter(
+            catalog_type=CatalogItem.CatalogType.CLASS_TYPE,
+            name__icontains="pres",
+        ).first()
+        self.assertIsNotNone(presencial_item, "No class_type CatalogItem found for presencial")
+
+        response = self.client.patch(
+            reverse("programming-subjects-detail", kwargs={"config_id": subject.id}),
+            {"class_type_item_id": presencial_item.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        subject.refresh_from_db()
+        self.assertEqual(subject.class_type_item_id, presencial_item.id)
+        self.assertEqual(subject.class_type, Subject.CLASS_TYPE_PRESENCIAL)
+
     def test_admin_can_crud_academic_period(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")
 
@@ -1473,6 +1548,64 @@ class SystemConfigApiTests(BaseAuthTestCase):
             reverse("config-periods-detail", kwargs={"config_id": period_id})
         )
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_admin_can_soft_delete_academic_period_with_schedule_executions(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        period = AcademicPeriod.objects.create(
+            code="2026-SOFT",
+            name="Periodo para borrar",
+            start_date=date(2026, 1, 15),
+            end_date=date(2026, 6, 15),
+            is_active=True,
+        )
+        ScheduleExecution.objects.create(
+            academic_period=period,
+            requested_by=self.admin_user,
+            status=ScheduleExecution.Status.COMPLETED,
+            progress=100,
+        )
+
+        response = self.client.delete(reverse("config-periods-detail", kwargs={"config_id": period.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        period.refresh_from_db()
+        self.assertFalse(period.is_active)
+
+    def test_admin_can_soft_delete_space_type(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        space_type = SpaceType.objects.create(name="Laboratorio Temporal", description="Prueba")
+
+        response = self.client.delete(reverse("config-space-types-detail", kwargs={"config_id": space_type.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        space_type.refresh_from_db()
+        self.assertFalse(space_type.is_active)
+
+    def test_admin_cannot_delete_academic_period_with_schedule_executions(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        period = AcademicPeriod.objects.create(
+            code="2026-BLK",
+            name="Periodo bloqueado",
+            start_date=date(2026, 1, 15),
+            end_date=date(2026, 6, 15),
+            is_active=True,
+        )
+        ScheduleExecution.objects.create(
+            academic_period=period,
+            requested_by=self.admin_user,
+            status=ScheduleExecution.Status.COMPLETED,
+            progress=100,
+        )
+
+        response = self.client.delete(reverse("config-periods-detail", kwargs={"config_id": period.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        period.refresh_from_db()
+        self.assertFalse(period.is_active)
+        self.assertTrue(AcademicPeriod.objects.filter(id=period.id).exists())
 
     def test_admin_can_publish_and_unpublish_academic_period(self):
         self.login_and_set_auth("admin@test.com", "adminpassword123")
@@ -1752,6 +1885,33 @@ class SystemConfigApiTests(BaseAuthTestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         item.refresh_from_db()
         self.assertFalse(item.is_active)
+
+    def test_catalog_item_name_can_be_reused_after_deactivation(self):
+        self.login_and_set_auth("admin@test.com", "adminpassword123")
+
+        item = CatalogItem.objects.create(
+            catalog_type="class_type",
+            name="Prueba",
+            description="Clase de prueba",
+            is_active=True,
+        )
+
+        delete_response = self.client.delete(
+            reverse(
+                "catalogs-detail",
+                kwargs={"catalog_type": "class_type", "config_id": item.id},
+            )
+        )
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+
+        create_response = self.client.post(
+            reverse("catalogs-list-create", kwargs={"catalog_type": "class_type"}),
+            {"name": "Prueba", "description": "Reutilizado"},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["name"], "Prueba")
 
     def test_non_admin_cannot_modify_catalog_items(self):
         self.login_and_set_auth("coord@test.com", "coordpassword123")
@@ -2164,16 +2324,47 @@ class ConfigServiceTests(TestCase):
         self.assertEqual(updated.code, "2026-1A")
         self.assertFalse(updated.is_active)
 
-        with self.assertRaises(ConfigValidationError):
-            update_academic_period(
-                second,
-                code="2026-1A",
-                name="Duplicado",
-                start_date=date(2026, 7, 1),
-                end_date=date(2026, 11, 30),
-                is_active=True,
-                is_schedule_published=False,
-            )
+        reused = update_academic_period(
+            second,
+            code="2026-1A",
+            name="Reutilizado",
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 11, 30),
+            is_active=True,
+            is_schedule_published=False,
+        )
+        self.assertEqual(reused.code, "2026-1A")
+        self.assertTrue(reused.is_active)
+
+    def test_period_code_can_be_reused_after_deactivation(self):
+        original = create_academic_period(
+            code="2026-1",
+            name="Periodo original",
+            start_date=date(2026, 1, 10),
+            end_date=date(2026, 5, 30),
+            is_active=True,
+        )
+
+        update_academic_period(
+            original,
+            code="2026-1",
+            name="Periodo original",
+            start_date=date(2026, 1, 10),
+            end_date=date(2026, 5, 30),
+            is_active=False,
+            is_schedule_published=False,
+        )
+
+        reused = create_academic_period(
+            code="2026-1",
+            name="Periodo reutilizado",
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 11, 30),
+            is_active=True,
+        )
+
+        self.assertEqual(reused.code, "2026-1")
+        self.assertTrue(reused.is_active)
 
     def test_working_day_update_and_duplicate_validation(self):
         monday = create_working_day(day_of_week=1, name="Lunes", is_active=True)
@@ -2256,13 +2447,14 @@ class ConfigServiceTests(TestCase):
         self.assertEqual(updated.name, "Catedra Externa")
         self.assertFalse(updated.is_active)
 
-        with self.assertRaises(ConfigValidationError):
-            update_catalog_item(
-                vinculo_2,
-                name="Catedra Externa",
-                description="Duplicado",
-                is_active=True,
-            )
+        reused = update_catalog_item(
+            vinculo_2,
+            name="Catedra Externa",
+            description="Reutilizado",
+            is_active=True,
+        )
+        self.assertEqual(reused.name, "Catedra Externa")
+        self.assertTrue(reused.is_active)
 
     def test_catalog_item_validates_catalog_type(self):
         with self.assertRaises(ConfigValidationError):

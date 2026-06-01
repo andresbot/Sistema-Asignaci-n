@@ -20,6 +20,8 @@ SECRET_KEY = os.getenv(
     "django-insecure-change-me-to-a-longer-development-secret-key",
 )
 DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() == "true"
+# Detect test runs via env or manage.py test
+TESTING = os.getenv("DJANGO_TESTING", "False").lower() == "true"
 ALLOWED_HOSTS = get_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
 
 INSTALLED_APPS = [
@@ -108,6 +110,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGINS = get_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 )
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost(:\d+)?$",
+    r"^http://127\.0\.0\.1(:\d+)?$",
+]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

@@ -38,7 +38,7 @@ class UserProfile(TimeStampedModel):
 
 
 class AcademicPeriod(TimeStampedModel):
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=20)
     name = models.CharField(max_length=120)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -54,6 +54,12 @@ class AcademicPeriod(TimeStampedModel):
                 check=models.Q(end_date__gte=models.F("start_date")),
                 name="period_end_after_or_equal_start",
             )
+            ,
+            models.UniqueConstraint(
+                fields=["code"],
+                condition=models.Q(is_active=True),
+                name="unique_active_academic_period_code",
+            ),
         ]
 
     def __str__(self):
@@ -211,6 +217,7 @@ class CatalogItem(TimeStampedModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["catalog_type", "name"],
+                condition=models.Q(is_active=True),
                 name="unique_catalog_item_per_type",
             )
         ]

@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -71,6 +72,23 @@ from .services.schedule_validation_service import validate_schedule_before_execu
 from .services.schedule_execution_service import queue_schedule_execution
 from .services.user_service import deactivate_user_profile
 from .services.programming_service import get_active_academic_period
+
+
+def _build_protected_delete_response(error, instance_label):
+    protected_objects = getattr(error, "protected_objects", None) or []
+    blocking_models = sorted({obj._meta.verbose_name for obj in protected_objects})
+    blocking_details = [str(obj) for obj in protected_objects]
+
+    message = f"No se puede eliminar {instance_label} porque tiene registros relacionados."
+    if blocking_models:
+        message += f" Bloqueado por: {', '.join(blocking_models)}."
+
+    payload = {
+        "detail": message,
+    }
+    if blocking_details:
+        payload["blocking_records"] = blocking_details
+    return Response(payload, status=status.HTTP_409_CONFLICT)
 
 
 @api_view(["GET"])
@@ -262,7 +280,10 @@ class ConfigDetailBaseAPIView(AdminProtectedAPIView):
 
     def delete(self, _request, config_id):
         instance = self.get_object(config_id)
-        instance.delete()
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            return _build_protected_delete_response(error, str(instance))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -347,7 +368,10 @@ class MasterDataDetailBaseAPIView(AdminProtectedAPIView):
 
     def delete(self, _request, item_id):
         instance = self.get_object(item_id)
-        instance.delete()
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            return _build_protected_delete_response(error, str(instance))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -359,6 +383,13 @@ class AcademicPeriodListCreateAPIView(ConfigListCreateBaseAPIView):
 class AcademicPeriodDetailAPIView(ConfigDetailBaseAPIView):
     queryset = AcademicPeriod.objects.all()
     serializer_class = AcademicPeriodSerializer
+
+    def delete(self, request, config_id):
+        _ = request
+        academic_period = self.get_object(config_id)
+        academic_period.is_active = False
+        academic_period.save(update_fields=["is_active", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def _get_pending_subject_offerings_for_period(academic_period):
@@ -460,6 +491,13 @@ class SpaceTypeListCreateAPIView(ConfigListCreateBaseAPIView):
 class SpaceTypeDetailAPIView(ConfigDetailBaseAPIView):
     queryset = SpaceType.objects.all()
     serializer_class = SpaceTypeSerializer
+
+    def delete(self, request, config_id):
+        _ = request
+        space_type = self.get_object(config_id)
+        space_type.is_active = False
+        space_type.save(update_fields=["is_active", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CatalogItemListCreateAPIView(APIView):
@@ -614,7 +652,10 @@ class SubjectOfferingDetailAPIView(CoordinatorProtectedAPIView):
 
     def delete(self, _request, subject_offering_id):
         instance = self.get_object(subject_offering_id)
-        instance.delete()
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            return _build_protected_delete_response(error, str(instance))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -938,7 +979,18 @@ class ScheduleExecutionListCreateAPIView(AdminProtectedAPIView):
             },
         )
 
-        transaction.on_commit(lambda: queue_schedule_execution(execution.id))
+        # In testing mode we want the worker to run immediately to avoid
+        # transaction.on_commit callbacks not being executed during test request
+        # handling. Use settings.TESTING to control this behavior.
+        try:
+            from django.conf import settings
+        except Exception:
+            settings = None
+
+        if getattr(settings, "TESTING", False):
+            queue_schedule_execution(execution.id)
+        else:
+            transaction.on_commit(lambda: queue_schedule_execution(execution.id))
 
         response_serializer = ScheduleExecutionSerializer(execution)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)

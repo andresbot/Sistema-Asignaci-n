@@ -127,6 +127,21 @@ def _run_schedule_execution_worker(execution_id):
 
 
 def queue_schedule_execution(execution_id):
+    # In test environments run synchronously to avoid sqlite locking and timing
+    # issues with background threads. Otherwise, spawn a daemon thread.
+    try:
+        from django.conf import settings
+    except Exception:
+        settings = None
+
+    # Run synchronously only in tests. In DEBUG (local dev) we should
+    # keep background execution so the API can return and the frontend
+    # can poll progress updates instead of receiving a completed result
+    # immediately.
+    if getattr(settings, "TESTING", False):
+        _run_schedule_execution_worker(execution_id)
+        return None
+
     worker = Thread(target=_run_schedule_execution_worker, args=(execution_id,), daemon=True)
     worker.start()
     return worker
