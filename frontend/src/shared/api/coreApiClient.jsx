@@ -21,6 +21,35 @@ export async function coreApiRequest(path, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    // If backend returned a field->messages validation payload,
+    // throw it as a JSON string so callers can map messages to fields.
+    if (payload && typeof payload === "object" && Object.keys(payload).length > 0 && !payload.detail) {
+      throw new Error(JSON.stringify(payload));
+    }
+
+    throw new Error(extractApiError(payload));
+  }
+
+  return payload;
+}
+
+export async function coreApiMultipartRequest(path, options = {}) {
+  const { method = "POST", token, formData } = options;
+
+  const response = await fetch(`${coreApiBase}${path}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
     throw new Error(extractApiError(payload));
   }
 

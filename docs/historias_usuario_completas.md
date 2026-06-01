@@ -47,12 +47,12 @@ Escenario 3: Acceso restringido por rol
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El login funciona con correo y contraseña almacenados en Supabase.
-- [ ] El sistema distingue y redirige correctamente según el rol (administrador / coordinador / docente / estudiante).
-- [ ] Las rutas están protegidas por rol en el backend Django.
-- [ ] Se muestran mensajes de error claros ante credenciales incorrectas.
-- [ ] Pruebas unitarias del endpoint de autenticación con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] El login funciona con correo y contraseña almacenados en Supabase.
+- [x] El sistema distingue y redirige correctamente según el rol (administrador / coordinador / docente / estudiante).
+- [x] Las rutas están protegidas por rol en el backend Django.
+- [x] Se muestran mensajes de error claros ante credenciales incorrectas.
+- [x] Pruebas unitarias del endpoint de autenticación con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -93,12 +93,12 @@ Escenario 3: Desactivar una cuenta
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El administrador puede crear, editar y desactivar cuentas desde la interfaz React.
-- [ ] El sistema soporta al menos los roles: administrador, coordinador, docente, estudiante.
-- [ ] Los cambios de rol toman efecto sin necesidad de reiniciar sesión (o con aviso claro).
-- [ ] Se valida que el correo sea único en el sistema.
-- [ ] Pruebas unitarias del servicio de gestión de usuarios con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] El administrador puede crear, editar y desactivar cuentas desde la interfaz React.
+- [x] El sistema soporta al menos los roles: administrador, coordinador, docente, estudiante.
+- [x] Los cambios de rol toman efecto sin necesidad de reiniciar sesión (o con aviso claro).
+- [x] Se valida que el correo sea único en el sistema.
+- [x] Pruebas unitarias del servicio de gestión de usuarios con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -144,11 +144,11 @@ Escenario 4: Intentar guardar una configuración incompleta
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El módulo permite CRUD completo de períodos académicos, días, franjas y tipos de espacio.
-- [ ] Los datos guardados son consumibles directamente por el servicio del algoritmo sin transformación manual.
-- [ ] Las validaciones impiden registros incompletos o con rangos horarios inválidos.
-- [ ] Pruebas unitarias del servicio de configuración con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] El módulo permite CRUD completo de períodos académicos, días, franjas y tipos de espacio.
+- [x] Los datos guardados son consumibles directamente por el servicio del algoritmo sin transformación manual.
+- [x] Las validaciones impiden registros incompletos o con rangos horarios inválidos.
+- [x] Pruebas unitarias del servicio de configuración con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -187,10 +187,10 @@ Escenario 2: Intentar crear un grupo duplicado
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El administrador puede agregar, editar y eliminar grupos por asignatura.
-- [ ] El sistema impide grupos duplicados para la misma asignatura.
-- [ ] Los grupos son visibles y seleccionables en el módulo de programación académica.
-- [ ] Aprobada por el Product Owner.
+- [x] El administrador puede agregar, editar y eliminar grupos por asignatura.
+- [x] El sistema impide grupos duplicados para la misma asignatura.
+- [x] Los grupos son visibles y seleccionables en el módulo de programación académica.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -229,11 +229,11 @@ Escenario 3: Intentar registrar un salón con código duplicado
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El módulo permite CRUD completo de salones con todos sus atributos (código, nombre, capacidad, tipo, sede, accesibilidad).
-- [ ] Los salones registrados son consumidos correctamente por el servicio del algoritmo.
-- [ ] Se valida unicidad del código de salón.
-- [ ] Pruebas unitarias del modelo de salones con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] El módulo permite CRUD completo de salones con todos sus atributos (código, nombre, capacidad, tipo, sede, accesibilidad).
+- [x] Los salones registrados son consumidos correctamente por el servicio del algoritmo.
+- [x] Se valida unicidad del código de salón.
+- [x] Pruebas unitarias del modelo de salones con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -273,10 +273,10 @@ Escenario 3: Eliminar un docente sin asignaturas activas
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] CRUD completo de docentes desde la interfaz React.
-- [ ] El sistema impide eliminar docentes con asignaturas asignadas en el período activo (o muestra advertencia).
-- [ ] Los datos del docente son consumibles por el algoritmo en la hoja `docentes`.
-- [ ] Aprobada por el Product Owner.
+- [x] CRUD completo de docentes desde la interfaz React.
+- [x] El sistema impide eliminar docentes con asignaturas asignadas en el período activo (o muestra advertencia).
+- [x] Los datos del docente son consumibles por el algoritmo en la hoja `docentes`.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -315,11 +315,11 @@ Escenario 3: Intentar registrar una asignatura con código duplicado
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] CRUD completo de asignaturas con todos sus atributos.
-- [ ] El campo `dificultad` (intensidad × cupo) es calculado automáticamente y disponible para el algoritmo.
-- [ ] Se valida unicidad del código de asignatura.
-- [ ] Pruebas unitarias con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] CRUD completo de asignaturas con todos sus atributos.
+- [x] El campo `dificultad` (intensidad × cupo) es calculado automáticamente y disponible para el algoritmo.
+- [x] Se valida unicidad del código de asignatura.
+- [x] Pruebas unitarias con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -353,10 +353,10 @@ Escenario 2: Intentar registrar una asignatura sin semestre
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El coordinador puede registrar asignaturas en la programación seleccionando del catálogo maestro.
-- [ ] Los campos código, programa y semestre son obligatorios y validados.
-- [ ] El registro queda vinculado al período académico activo.
-- [ ] Aprobada por el Product Owner.
+- [x] El coordinador puede registrar asignaturas en la programación seleccionando del catálogo maestro.
+- [x] Los campos código, programa y semestre son obligatorios y validados.
+- [x] El registro queda vinculado al período académico activo.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -396,9 +396,9 @@ Escenario 3: Intentar guardar sin seleccionar docente
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El coordinador puede asignar y cambiar el docente de cualquier asignatura antes de ejecutar el algoritmo.
-- [ ] El docente asignado se refleja en los datos enviados al servicio del algoritmo.
-- [ ] Aprobada por el Product Owner.
+- [x] El coordinador puede asignar y cambiar el docente de cualquier asignatura antes de ejecutar el algoritmo.
+- [x] El docente asignado se refleja en los datos enviados al servicio del algoritmo.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -432,9 +432,9 @@ Escenario 2: Ingresar un número de estudiantes mayor a la capacidad de todos lo
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El campo cupo es numérico, obligatorio y mayor que cero.
-- [ ] El valor es consumido por el algoritmo como restricción de capacidad mínima.
-- [ ] Aprobada por el Product Owner.
+- [x] El campo cupo es numérico, obligatorio y mayor que cero.
+- [x] El valor es consumido por el algoritmo como restricción de capacidad mínima.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -477,10 +477,10 @@ Escenario 3: Intentar asignar una hora de fin anterior a la hora de inicio
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El coordinador puede seleccionar día y franja para cada asignatura dentro de los parámetros configurados.
-- [ ] Las validaciones impiden franjas fuera de los días laborables o con rangos inválidos.
-- [ ] Los datos son consumidos correctamente por el algoritmo.
-- [ ] Aprobada por el Product Owner.
+- [x] El coordinador puede seleccionar día y franja para cada asignatura dentro de los parámetros configurados.
+- [x] Las validaciones impiden franjas fuera de los días laborables o con rangos inválidos.
+- [x] Los datos son consumidos correctamente por el algoritmo.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -514,9 +514,9 @@ Escenario 2: Asignatura sin necesidad de accesibilidad
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El campo accesibilidad es un indicador booleano visible y editable por el coordinador.
-- [ ] El algoritmo respeta esta restricción en la selección de salones.
-- [ ] Aprobada por el Product Owner.
+- [x] El campo accesibilidad es un indicador booleano visible y editable por el coordinador.
+- [x] El algoritmo respeta esta restricción en la selección de salones.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -550,9 +550,9 @@ Escenario 2: No hay salones disponibles del tipo requerido
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El tipo de espacio se selecciona desde el catálogo configurado por el administrador (HU3).
-- [ ] El algoritmo filtra salones por tipo antes de evaluar capacidad y disponibilidad.
-- [ ] Aprobada por el Product Owner.
+- [x] El tipo de espacio se selecciona desde el catálogo configurado por el administrador (HU3).
+- [x] El algoritmo filtra salones por tipo antes de evaluar capacidad y disponibilidad.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -586,10 +586,10 @@ Escenario 2: Intentar editar la programación después de ejecutar el algoritmo
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] Todos los campos de la programación son editables antes de la ejecución del algoritmo.
-- [ ] El sistema advierte al usuario si intenta editar después de haber ejecutado el algoritmo.
-- [ ] Los cambios se reflejan inmediatamente en los datos que serán enviados al servicio.
-- [ ] Aprobada por el Product Owner.
+- [x] Todos los campos de la programación son editables antes de la ejecución del algoritmo.
+- [x] El sistema advierte al usuario si intenta editar después de haber ejecutado el algoritmo.
+- [x] Los cambios se reflejan inmediatamente en los datos que serán enviados al servicio.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -629,12 +629,12 @@ Escenario 3: Importar un archivo con registros duplicados
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El sistema acepta archivos `.csv` y `.xlsx`.
-- [ ] Se validan columnas obligatorias antes de procesar.
-- [ ] Se genera un reporte de importación (exitosos, errores, omitidos).
-- [ ] La importación no duplica registros existentes.
-- [ ] Pruebas con archivos reales del formato institucional.
-- [ ] Aprobada por el Product Owner.
+- [x] El sistema acepta archivos `.csv` y `.xlsx`.
+- [x] Se validan columnas obligatorias antes de procesar.
+- [x] Se genera un reporte de importación (exitosos, errores, omitidos).
+- [x] La importación no duplica registros existentes.
+- [x] Pruebas con archivos reales del formato institucional.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -672,11 +672,11 @@ Escenario 3: Validación detecta conflictos de docente en misma franja
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] La validación detecta: asignaturas sin franja, sin docente, sin cupo, sin tipo de espacio, y conflictos de docente en la misma franja.
-- [ ] El botón de ejecutar algoritmo solo se habilita si la validación pasa sin errores críticos.
-- [ ] El reporte de validación es claro y accionable.
-- [ ] Pruebas unitarias del servicio de validación con cobertura ≥ 95 %.
-- [ ] Aprobada por el Product Owner.
+- [x] La validación detecta: asignaturas sin franja, sin docente, sin cupo, sin tipo de espacio, y conflictos de docente en la misma franja.
+- [x] El botón de ejecutar algoritmo solo se habilita si la validación pasa sin errores críticos.
+- [x] El reporte de validación es claro y accionable.
+- [x] Pruebas unitarias del servicio de validación con cobertura ≥ 95 %.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -767,11 +767,11 @@ Escenario 3: Visualizar asignaturas no asignadas
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] La plantilla gráfica muestra el horario completo en formato grilla semanal.
-- [ ] Es posible filtrar por sede, programa y semestre.
-- [ ] Las asignaturas no asignadas se muestran con su razón.
-- [ ] La vista es responsiva y usable desde pantallas de escritorio.
-- [ ] Aprobada por el Product Owner.
+- [x] La plantilla gráfica muestra el horario completo en formato grilla semanal.
+- [x] Es posible filtrar por sede, programa y semestre.
+- [x] Las asignaturas no asignadas se muestran con su razón.
+- [x] La vista es responsiva y usable desde pantallas de escritorio.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -842,10 +842,10 @@ Escenario 2: Filtrar el horario por programa o semestre
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El coordinador tiene acceso de solo lectura al horario generado.
-- [ ] La vista incluye filtros por programa, semestre y sede.
-- [ ] La información mostrada coincide exactamente con el resultado del algoritmo y los ajustes manuales registrados.
-- [ ] Aprobada por el Product Owner.
+- [x] El coordinador tiene acceso de solo lectura al horario generado.
+- [x] La vista incluye filtros por programa, semestre y sede.
+- [x] La información mostrada coincide exactamente con el resultado del algoritmo y los ajustes manuales registrados.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -962,10 +962,10 @@ Escenario 3: Intentar publicar un horario con asignaturas sin salón asignado
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El horario tiene estados claramente diferenciados: borrador, publicado.
-- [ ] Solo los administradores pueden publicar y despublicar.
-- [ ] El cambio de estado es inmediato y visible para todos los usuarios con rol docente/estudiante.
-- [ ] Aprobada por el Product Owner.
+- [x] El horario tiene estados claramente diferenciados: borrador, publicado.
+- [x] Solo los administradores pueden publicar y despublicar.
+- [x] El cambio de estado es inmediato y visible para todos los usuarios con rol docente/estudiante.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -998,10 +998,10 @@ Escenario 2: El horario aún no ha sido publicado
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] El usuario puede seleccionar el período académico a consultar.
-- [ ] Solo se muestran horarios en estado "publicado".
-- [ ] La vista es de solo lectura para docentes y estudiantes.
-- [ ] Aprobada por el Product Owner.
+- [x] El usuario puede seleccionar el período académico a consultar.
+- [x] Solo se muestran horarios en estado "publicado".
+- [x] La vista es de solo lectura para docentes y estudiantes.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -1029,9 +1029,9 @@ Escenario 1: Ver detalle completo de una clase
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] Cada entrada del horario muestra todos los campos requeridos.
-- [ ] La información de sede y salón coincide exactamente con la asignación del algoritmo o los ajustes manuales.
-- [ ] Aprobada por el Product Owner.
+- [x] Cada entrada del horario muestra todos los campos requeridos.
+- [x] La información de sede y salón coincide exactamente con la asignación del algoritmo o los ajustes manuales.
+- [x] Aprobada por el Product Owner.
 
 ---
 
@@ -1065,9 +1065,9 @@ Escenario 2: Grilla sin clases en una franja
 ```
 
 **Confirmation — Definición de hecho**
-- [ ] La plantilla visual es la vista principal del horario para usuarios generales.
-- [ ] Es legible en pantallas de escritorio y tablet.
-- [ ] Aprobada por el Product Owner.
+- [x] La plantilla visual es la vista principal del horario para usuarios generales.
+- [x] Es legible en pantallas de escritorio y tablet.
+- [x] Aprobada por el Product Owner.
 
 ---
 
