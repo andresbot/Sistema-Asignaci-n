@@ -11,27 +11,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.SeparateDatabaseAndState(
-            database_operations=[
-                migrations.RunSQL(
-                    sql="""
-                    CREATE TABLE IF NOT EXISTS core_scheduleexecution (
-                        id integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                        created_at datetime NOT NULL,
-                        updated_at datetime NOT NULL,
-                        status varchar(20) NOT NULL,
-                        progress smallint unsigned NOT NULL CHECK (progress >= 0),
-                        parameters text NOT NULL,
-                        result_snapshot text NOT NULL,
-                        error_message text NOT NULL,
-                        started_at datetime NULL,
-                        finished_at datetime NULL,
-                        academic_period_id bigint NOT NULL REFERENCES core_academicperiod (id) DEFERRABLE INITIALLY DEFERRED,
-                        requested_by_id integer NOT NULL REFERENCES auth_user (id) DEFERRABLE INITIALLY DEFERRED
-                    );
-                    """,
-                    reverse_sql="DROP TABLE IF EXISTS core_scheduleexecution;",
-                )
-            ],
+            database_operations=[],
             state_operations=[
                 migrations.CreateModel(
                     name="ScheduleExecution",
