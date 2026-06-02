@@ -5,7 +5,106 @@ import { RowMenu } from "../../../shared/components/RowMenu";
 import { useToast } from "../../../shared/components/Toast";
 
 const SECTION_DEFINITIONS = {
+  classTypes: {
+    step: 1,
+    group: "Configuracion base",
+    title: "Tipos de clase",
+    fields: [
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "description", label: "Descripcion", type: "text", required: false },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  academicSpaceTypes: {
+    step: 2,
+    group: "Configuracion base",
+    title: "Tipos de espacio academico",
+    fields: [
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "description", label: "Descripcion", type: "text", required: false },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  campuses: {
+    step: 3,
+    group: "Configuracion base",
+    title: "Campus",
+    fields: [
+      { name: "code", label: "Codigo", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  periods: {
+    step: 4,
+    group: "Configuracion base",
+    title: "Periodo academico",
+    fields: [
+      { name: "code", label: "Codigo", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "start_date", label: "Fecha inicio", type: "date", required: true },
+      { name: "end_date", label: "Fecha fin", type: "date", required: true },
+      { name: "is_schedule_published", label: "Horario publicado", type: "checkbox", required: false },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  workingDays: {
+    step: 5,
+    group: "Disponibilidad horaria",
+    title: "Dias laborables",
+    fields: [
+      {
+        name: "day_of_week",
+        label: "Dia (1-7)",
+        type: "number",
+        min: 1,
+        max: 7,
+        required: true,
+      },
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  timeSlots: {
+    step: 6,
+    group: "Disponibilidad horaria",
+    title: "Franjas horarias",
+    fields: [
+      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "start_time", label: "Hora inicio", type: "time", required: true },
+      { name: "end_time", label: "Hora fin", type: "time", required: true },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
+  classrooms: {
+    step: 7,
+    group: "Infraestructura",
+    title: "Salones",
+    fields: [
+      { name: "code", label: "Codigo", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: true },
+      {
+        name: "campus_id",
+        label: "Campus",
+        type: "select",
+        required: true,
+        optionsFrom: "campuses",
+      },
+      {
+        name: "space_type_id",
+        label: "Tipo de espacio",
+        type: "select",
+        required: true,
+        optionsFrom: "academicSpaceTypes",
+      },
+      { name: "capacity", label: "Capacidad", type: "number", required: true, min: 1 },
+      { name: "is_accessible", label: "Accesible", type: "checkbox", required: false },
+      { name: "is_active", label: "Activo", type: "checkbox", required: false },
+    ],
+  },
   academicPrograms: {
+    step: 8,
+    group: "Oferta academica",
     title: "Programas academicos",
     fields: [
       { name: "code", label: "Codigo", type: "text", required: true },
@@ -20,15 +119,9 @@ const SECTION_DEFINITIONS = {
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
-  campuses: {
-    title: "Campus",
-    fields: [
-      { name: "code", label: "Codigo", type: "text", required: true },
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
   subjects: {
+    step: 9,
+    group: "Oferta academica",
     title: "Catalogo de asignaturas",
     fields: [
       { name: "code", label: "Codigo", type: "text", required: true },
@@ -53,6 +146,8 @@ const SECTION_DEFINITIONS = {
     ],
   },
   subjectGroups: {
+    step: 10,
+    group: "Oferta academica",
     title: "Grupos por asignatura",
     fields: [
       {
@@ -67,6 +162,8 @@ const SECTION_DEFINITIONS = {
     ],
   },
   subjectOfferings: {
+    step: 11,
+    group: "Oferta academica",
     title: "Programacion de asignaturas",
     fields: [
       {
@@ -129,86 +226,13 @@ const SECTION_DEFINITIONS = {
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
-  periods: {
-    title: "Periodos academicos",
-    fields: [
-      { name: "code", label: "Codigo", type: "text", required: true },
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "start_date", label: "Fecha inicio", type: "date", required: true },
-      { name: "end_date", label: "Fecha fin", type: "date", required: true },
-      { name: "is_schedule_published", label: "Horario publicado", type: "checkbox", required: false },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
-  workingDays: {
-    title: "Dias laborables",
-    fields: [
-      {
-        name: "day_of_week",
-        label: "Dia (1-7)",
-        type: "number",
-        min: 1,
-        max: 7,
-        required: true,
-      },
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
-  timeSlots: {
-    title: "Franjas horarias",
-    fields: [
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "start_time", label: "Hora inicio", type: "time", required: true },
-      { name: "end_time", label: "Hora fin", type: "time", required: true },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
   teacherLinkTypes: {
+    step: null,
+    group: "Docentes",
     title: "Tipos de vinculacion docente",
     fields: [
-      { name: "name", label: "Nombre", type: "text", required: true },
+      { name: "name", label: "Nombre", type: "text", required: false },
       { name: "description", label: "Descripcion", type: "text", required: false },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
-  classTypes: {
-    title: "Tipos de clase",
-    fields: [
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "description", label: "Descripcion", type: "text", required: false },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
-  academicSpaceTypes: {
-    title: "Tipos de espacio academico",
-    fields: [
-      { name: "name", label: "Nombre", type: "text", required: true },
-      { name: "description", label: "Descripcion", type: "text", required: false },
-      { name: "is_active", label: "Activo", type: "checkbox", required: false },
-    ],
-  },
-  classrooms: {
-    title: "Salones disponibles",
-    fields: [
-      { name: "code", label: "Codigo", type: "text", required: true },
-      { name: "name", label: "Nombre", type: "text", required: true },
-      {
-        name: "campus_id",
-        label: "Campus",
-        type: "select",
-        required: true,
-        optionsFrom: "campuses",
-      },
-      {
-        name: "space_type_id",
-        label: "Tipo de espacio",
-        type: "select",
-        required: true,
-        optionsFrom: "academicSpaceTypes",
-      },
-      { name: "capacity", label: "Capacidad", type: "number", required: true, min: 1 },
-      { name: "is_accessible", label: "Accesible", type: "checkbox", required: false },
       { name: "is_active", label: "Activo", type: "checkbox", required: false },
     ],
   },
@@ -305,6 +329,7 @@ function SectionFormFields({ sectionKey, sectionState, fields, configState, onFi
 
 function ConfigSectionCard({
   sectionKey,
+  step,
   title,
   sectionState,
   fields,
@@ -367,7 +392,12 @@ function ConfigSectionCard({
   return (
     <article className="card-block config-card">
       <div className="config-card-header">
-        <h2>{title}</h2>
+        <h2>
+          {step != null ? (
+            <span className="config-step-badge">{step}</span>
+          ) : null}
+          {title}
+        </h2>
         <button type="button" onClick={openAdd}>
           + Agregar
         </button>
@@ -547,22 +577,23 @@ export function SystemConfigPanel({
 
       <div className="config-grid">
         {sectionEntries.map(([sectionKey, sectionDefinition]) => (
-          <ConfigSectionCard
-            key={sectionKey}
-            sectionKey={sectionKey}
-            title={sectionDefinition.title}
-            sectionState={configState[sectionKey]}
-            fields={sectionDefinition.fields}
-            configState={configState}
-            onFieldChange={onFieldChange}
-            onSubmit={onSubmit}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onCancel={onCancel}
-            onPublishPeriod={onPublishPeriod}
-            onUnpublishPeriod={onUnpublishPeriod}
-          />
-        ))}
+              <ConfigSectionCard
+                key={sectionKey}
+                sectionKey={sectionKey}
+                step={sectionDefinition.step}
+                title={sectionDefinition.title}
+                sectionState={configState[sectionKey]}
+                fields={sectionDefinition.fields}
+                configState={configState}
+                onFieldChange={onFieldChange}
+                onSubmit={onSubmit}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onCancel={onCancel}
+                onPublishPeriod={onPublishPeriod}
+                onUnpublishPeriod={onUnpublishPeriod}
+              />
+            ))}
       </div>
 
       {showImportSection ? (
