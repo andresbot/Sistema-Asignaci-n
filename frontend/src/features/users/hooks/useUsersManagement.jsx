@@ -143,7 +143,7 @@ export function useUsersManagement({ authToken, enabled }) {
   const handleDeactivateUser = async (user) => {
     const approved = window.confirm(`Desactivar a ${user.first_name} ${user.last_name}?`);
     if (!approved) {
-      return;
+      return null;
     }
 
     try {
@@ -153,8 +153,11 @@ export function useUsersManagement({ authToken, enabled }) {
       if (selectedUserId === user.id) {
         resetFormToCreate();
       }
+
+      return true;
     } catch (error) {
       setUsersError(error.message || "No se pudo desactivar el usuario.");
+      return false;
     }
   };
 

@@ -872,12 +872,12 @@ export function useSystemConfig({ authToken, enabled, role }) {
 
   const handleDelete = async (resourceKey, itemId) => {
     if (!authToken) {
-      return;
+      return null;
     }
 
     const approved = window.confirm("Deseas eliminar este registro?");
     if (!approved) {
-      return;
+      return null;
     }
 
     const resourceApi = RESOURCE_CONFIG[resourceKey];
@@ -897,11 +897,15 @@ export function useSystemConfig({ authToken, enabled, role }) {
           form: { ...resourceApi.defaultForm },
         };
       });
+
+      return true;
     } catch (error) {
       setResourceState(resourceKey, (resourceState) => ({
         ...resourceState,
         error: error.message || "No fue posible eliminar el registro.",
       }));
+
+      return false;
     }
   };
 
